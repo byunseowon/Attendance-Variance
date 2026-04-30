@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수료보고 출석률 비교</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --teal:    #5ecece;
+  --teal-d:  #3fb8b8;
+  --coral:   #ff8c8c;
+  --coral-d: #f07070;
+  --yellow:  #ffd97d;
+  --mint:    #a8e6d0;
+  --lavender:#c4b5f4;
+  --pink:    #ffb3c6;
+  --bg:      #fdf5f2;
+  --card:    #ffffff;
+  --text:    #2d2d3a;
+  --sub:     #9b9bab;
+  --border:  rgba(0,0,0,0.06);
+}
+
+body {
+  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ── 배경 블롭 ─────────────────────────────────── */
+.blob-wrap {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.35;
+}
+.blob-1 { width: 500px; height: 500px; background: var(--teal);    top: -160px; right: -120px; }
+.blob-2 { width: 420px; height: 420px; background: var(--coral);   bottom: -140px; left: -100px; }
+.blob-3 { width: 300px; height: 300px; background: var(--yellow);  top: 40%; left: 5%; }
+.blob-4 { width: 260px; height: 260px; background: var(--lavender);bottom: 20%; right: 5%; }
+.blob-5 { width: 200px; height: 200px; background: var(--mint);    top: 55%; right: 15%; }
+
+/* ── 레이아웃 ───────────────────────────────────── */
+.container {
+  position: relative; z-index: 1;
+  max-width: 1440px; margin: 0 auto; padding: 40px 28px 60px;
+}
+
+/* ── 헤더 ───────────────────────────────────────── */
+.page-header {
+  margin-bottom: 32px;
+}
+.page-tagline {
+  font-size: 0.78rem; font-weight: 700; color: var(--teal-d);
+  text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;
+}
+.page-title {
+  font-size: 2rem; font-weight: 800; color: var(--text);
+  letter-spacing: -0.8px; line-height: 1.25;
+}
+.page-title span { color: var(--teal-d); }
+.page-sub {
+  margin-top: 8px; font-size: 0.85rem; color: var(--sub); font-weight: 400;
+}
+
+/* ── 카드 공통 ──────────────────────────────────── */
+.card {
+  background: var(--card);
+  border-radius: 28px;
+  box-shadow: 0 4px 32px rgba(80,60,80,0.08), 0 1px 4px rgba(0,0,0,0.04);
+  margin-bottom: 20px;
+}
+
+/* ── 입력 영역 ──────────────────────────────────── */
+.input-section { padding: 32px 32px 28px; }
+
+.section-label {
+  font-size: 0.72rem; font-weight: 700; color: var(--sub);
+  text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-label::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr 300px; gap: 24px; margin-bottom: 24px; }
+.form-group { display: flex; flex-direction: column; gap: 10px; }
+
+label {
+  font-size: 0.75rem; font-weight: 700; color: var(--sub);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.label-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+}
+
+textarea {
+  width: 100%; height: 210px; padding: 16px 18px;
+  border: 2px solid transparent; border-radius: 18px;
+  font-size: 0.83rem; resize: vertical; font-family: inherit; line-height: 1.7;
+  background: #faf5f3; color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+textarea:focus {
+  outline: none; border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(94,206,206,0.15); background: #fff;
+}
+textarea::placeholder { color: #c8c4d0; }
+
+/* 파일 드롭존 */
+.file-drop-zone {
+  border: 2px dashed rgba(94,206,206,0.4); border-radius: 18px;
+  cursor: pointer; transition: all 0.2s; background: #faf5f3; height: 210px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+}
+.file-drop-zone:hover, .file-drop-zone.drag-over {
+  border-color: var(--teal); background: rgba(94,206,206,0.06);
+}
+.file-drop-zone.has-file {
+  border-color: var(--mint); border-style: solid; background: rgba(168,230,208,0.1);
+}
+.file-drop-zone input { display: none; }
+.drop-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(94,206,206,0.12); display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+}
+.file-drop-zone.has-file .drop-icon { background: rgba(168,230,208,0.25); }
+.file-name { font-size: 0.85rem; font-weight: 700; color: #3fb8b8; }
+
+/* 임계값 */
+.threshold-group { display: flex; flex-direction: column; gap: 10px; }
+.threshold-item {
+  background: #faf5f3; border-radius: 14px; padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.threshold-item.high { border-left: 3px solid var(--yellow); }
+.threshold-item.low  { border-left: 3px solid var(--coral); }
+.th-label { font-size: 0.78rem; color: var(--sub); font-weight: 600; flex: 1; }
+.th-input {
+  width: 68px; padding: 8px; border: 2px solid var(--border); border-radius: 10px;
+  font-size: 1rem; font-weight: 800; text-align: center; font-family: inherit;
+  background: white; color: var(--text); transition: border-color 0.15s;
+}
+.th-input:focus { outline: none; border-color: var(--teal); }
+.th-unit { font-size: 0.78rem; font-weight: 700; color: var(--sub); }
+.threshold-hint {
+  background: rgba(255,217,125,0.15); border-radius: 12px;
+  padding: 12px 14px; font-size: 0.75rem; color: #7a6a3a; line-height: 1.7;
+}
+.threshold-hint strong { color: #c08000; }
+
+/* 실행 버튼 */
+.btn-run {
+  width: 100%; padding: 18px; background: linear-gradient(135deg, var(--teal) 0%, var(--teal-d) 100%);
+  color: white; border: none; border-radius: 18px;
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; letter-spacing: -0.1px;
+  font-family: inherit;
+  box-shadow: 0 6px 20px rgba(94,206,206,0.35);
+}
+.btn-run:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(94,206,206,0.45);
+}
+.btn-run:active { transform: translateY(0); }
+
+/* ── 요약 카드 ──────────────────────────────────── */
+.stats-bar { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 16px; }
+.stat-card {
+  padding: 20px 18px; border-radius: 22px;
+  background: white;
+  box-shadow: 0 2px 16px rgba(80,60,80,0.07);
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: ''; position: absolute;
+  width: 80px; height: 80px; border-radius: 50%;
+  top: -20px; right: -20px; opacity: 0.12;
+}
+.stat-card.total  { background: linear-gradient(135deg,#e8f9f9,#d0f4f4); }
+.stat-card.total::before  { background: var(--teal); }
+.stat-card.ok     { background: linear-gradient(135deg,#eafaf1,#d4f5e2); }
+.stat-card.ok::before     { background: var(--mint); }
+.stat-card.yellow { background: linear-gradient(135deg,#fffaec,#fff3cc); }
+.stat-card.yellow::before { background: var(--yellow); }
+.stat-card.red    { background: linear-gradient(135deg,#fff0f0,#ffe0e0); }
+.stat-card.red::before    { background: var(--coral); }
+.stat-card.grey   { background: linear-gradient(135deg,#f5f5f7,#ebebee); }
+.stat-card.grey::before   { background: #b0b0c0; }
+.stat-num { font-size: 2rem; font-weight: 800; letter-spacing: -1.5px; line-height: 1; }
+.stat-card.total  .stat-num { color: #2aacac; }
+.stat-card.ok     .stat-num { color: #2fa876; }
+.stat-card.yellow .stat-num { color: #d48800; }
+.stat-card.red    .stat-num { color: #e03030; }
+.stat-card.grey   .stat-num { color: #6060780; }
+.stat-lbl { font-size: 0.73rem; color: var(--sub); margin-top: 6px; font-weight: 600; }
+
+/* ── 인원 현황 패널 ─────────────────────────────── */
+.hc-panel { padding: 24px 28px; }
+.hc-panel-title {
+  font-size: 0.88rem; font-weight: 700; margin-bottom: 16px;
+  color: var(--text); display: flex; align-items: center; gap: 8px;
+}
+.hc-panel-title::before {
+  content: ''; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--teal); display: inline-block;
+}
+.hc-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.hc-table th {
+  background: rgba(94,206,206,0.08); padding: 10px 18px; text-align: center;
+  border-bottom: 2px solid rgba(94,206,206,0.15);
+  font-weight: 700; color: #4aacac; font-size: 0.73rem;
+  text-transform: uppercase; letter-spacing: 0.6px;
+}
+.hc-table th:first-child { text-align: left; border-radius: 12px 0 0 0; }
+.hc-table th:last-child  { border-radius: 0 12px 0 0; }
+.hc-table td { padding: 12px 18px; border-bottom: 1px solid rgba(0,0,0,0.04); text-align: center; }
+.hc-table td:first-child { font-weight: 600; text-align: left; }
+.hc-table tbody tr:last-child td { border-bottom: none; }
+.hc-num { font-size: 1.05rem; font-weight: 800; color: var(--text); }
+.hc-match { color: #2fa876; font-weight: 700; font-size: 0.83rem; }
+.hc-warn  { color: #d48800; font-weight: 700; font-size: 0.83rem; }
+.hc-error { color: #e03030; font-weight: 700; font-size: 0.83rem; }
+.hc-row-total td { background: rgba(94,206,206,0.05); font-weight: 700; }
+
+/* ── 결과 영역 ──────────────────────────────────── */
+.result-section { padding: 28px 30px; display: none; }
+.result-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 22px; flex-wrap: wrap; gap: 12px;
+}
+.result-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn-csv, .btn-copy-csv, .btn-slack {
+  padding: 10px 18px; border: none; border-radius: 980px;
+  font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit;
+  transition: all 0.2s;
+}
+.btn-csv {
+  background: linear-gradient(135deg, var(--teal), var(--teal-d));
+  color: white; box-shadow: 0 3px 12px rgba(94,206,206,0.3);
+}
+.btn-copy-csv { background: #f0ecf8; color: #6a5a8a; }
+.btn-copy-csv.copied { background: var(--mint); color: #1a7a55; }
+.btn-slack {
+  background: linear-gradient(135deg, #3d3d52, #2d2d3a);
+  color: white; box-shadow: 0 3px 12px rgba(45,45,58,0.25);
+}
+.btn-csv:hover, .btn-copy-csv:hover, .btn-slack:hover { transform: translateY(-1px); opacity: 0.92; }
+
+/* 슬랙 패널 */
+.slack-panel {
+  display: none; background: #1e1e2e; border-radius: 20px;
+  padding: 22px 24px; margin-bottom: 22px;
+  box-shadow: 0 8px 32px rgba(20,20,40,0.2);
+}
+.slack-panel.active { display: block; }
+.slack-panel-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+}
+.slack-panel-title {
+  font-size: 0.78rem; font-weight: 700; color: #7a7a9a;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.slack-panel-actions { display: flex; gap: 8px; }
+.btn-copy-slack {
+  padding: 6px 16px; background: #2e2e44; color: #d0d0f0;
+  border: none; border-radius: 980px; font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn-copy-slack:hover { background: #3a3a58; }
+.btn-copy-slack.copied { background: #1a3d2e; color: #34c759; }
+.btn-close-slack {
+  padding: 6px 14px; background: transparent; color: #5a5a7a;
+  border: 1px solid #3a3a58; border-radius: 980px;
+  font-size: 0.78rem; cursor: pointer; font-family: inherit;
+}
+.slack-content {
+  color: #c8c8e8; font-size: 0.83rem; white-space: pre-wrap;
+  line-height: 2.1; font-family: 'SF Mono','Menlo',monospace;
+  max-height: 360px; overflow-y: auto;
+}
+
+/* ── 결과 테이블 ─────────────────────────────────── */
+.table-wrap {
+  overflow-x: auto; border-radius: 18px;
+  border: 1.5px solid rgba(94,206,206,0.15);
+  box-shadow: 0 2px 16px rgba(80,60,80,0.05);
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th {
+  background: rgba(94,206,206,0.08); padding: 12px 12px; text-align: center;
+  border-bottom: 2px solid rgba(94,206,206,0.15);
+  font-size: 0.72rem; font-weight: 700; color: #4aacac;
+  text-transform: uppercase; letter-spacing: 0.6px; white-space: nowrap;
+}
+td { padding: 11px 12px; border-bottom: 1px solid rgba(0,0,0,0.04); text-align: center; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { transition: background 0.15s; }
+
+tr.row-ok       { background: white; }
+tr.row-ok:hover { background: rgba(94,206,206,0.04); }
+tr.row-yellow   { background: rgba(255,217,125,0.1); }
+tr.row-yellow:hover { background: rgba(255,217,125,0.18); }
+tr.row-red      { background: rgba(255,140,140,0.08); }
+tr.row-red:hover { background: rgba(255,140,140,0.15); }
+tr.row-unmatched       { background: rgba(255,140,140,0.08); }
+tr.row-unmatched:hover { background: rgba(255,140,140,0.15); }
+tr.row-hrd-only        { background: rgba(255,140,140,0.08); }
+tr.row-hrd-only:hover  { background: rgba(255,140,140,0.15); }
+tr.row-exit  { background: rgba(180,180,200,0.08); }
+tr.row-exit:hover  { background: rgba(180,180,200,0.14); }
+tr.row-early { background: rgba(196,181,244,0.1); }
+tr.row-early:hover { background: rgba(196,181,244,0.18); }
+
+/* 배지 */
+.badge {
+  display: inline-block; padding: 4px 11px; border-radius: 980px;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.2px;
+}
+.badge-ok     { background: rgba(168,230,208,0.3);  color: #1a7a55; }
+.badge-yellow { background: rgba(255,217,125,0.3);  color: #a06800; }
+.badge-red    { background: rgba(255,140,140,0.25); color: #c01010; }
+.badge-exit   { background: rgba(180,180,200,0.2);  color: #50506a; }
+.badge-early  { background: rgba(196,181,244,0.3);  color: #5a30a0; }
+.badge-grad   { background: rgba(168,230,208,0.3);  color: #1a7a55; }
+
+.diff-ok     { color: #2aacac; font-weight: 700; }
+.diff-yellow { color: #d48800; font-weight: 700; }
+.diff-red    { color: #e03030; font-weight: 700; }
+
+/* 사유 입력 */
+.reason-input {
+  width: 100%; min-width: 150px; padding: 7px 12px;
+  border: 2px solid transparent; border-radius: 10px;
+  font-size: 0.79rem; font-family: inherit;
+  background: rgba(94,206,206,0.06);
+  color: var(--text); transition: all 0.15s;
+}
+.reason-input:focus {
+  outline: none; border-color: var(--teal);
+  background: white; box-shadow: 0 0 0 3px rgba(94,206,206,0.15);
+}
+.reason-na { color: #c8c4d0; font-size: 0.75rem; }
+.check-cell { text-align: center; }
+.include-check { width: 16px; height: 16px; cursor: pointer; accent-color: var(--teal); }
+
+/* 필터 버튼 */
+.filter-btn {
+  padding: 7px 16px; border-radius: 980px;
+  border: 2px solid rgba(94,206,206,0.2); background: white;
+  font-size: 0.76rem; font-weight: 700; cursor: pointer; color: var(--sub);
+  transition: all 0.15s; font-family: inherit;
+}
+.filter-btn:hover { border-color: var(--teal); color: var(--teal-d); }
+.filter-btn.filter-active {
+  background: linear-gradient(135deg, var(--teal), var(--teal-d));
+  color: white; border-color: transparent;
+  box-shadow: 0 3px 10px rgba(94,206,206,0.3);
+}
+</style>
+</head>
+<body>
+
+<!-- 배경 블롭 -->
+<div class="blob-wrap">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+  <div class="blob blob-5"></div>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <div class="page-tagline">Completion Report Tool</div>
+    <div class="page-title">수료보고<br><span>출석률 비교</span> 프로그램</div>
+    <div class="page-sub">백오피스와 HRD-Net 출석 데이터를 자동으로 비교합니다.</div>
+  </div>
+
+  <div class="card input-section">
+    <div class="section-label">데이터 입력</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>
+          <span class="label-dot" style="background:var(--teal)"></span>
+          백오피스 수강생 목록
+        </label>
+        <textarea id="backofficeInput" placeholder="백오피스에서 표 전체 복사 후 붙여넣으세요.&#10;헤더 포함 여부 상관없이 자동 파싱됩니다.&#10;조기수료 / 중도하차 수강생도 함께 붙여넣어도 됩니다."></textarea>
+      </div>
+      <div class="form-group">
+        <label>
+          <span class="label-dot" style="background:var(--coral)"></span>
+          HRD 출석부 엑셀
+        </label>
+        <div class="file-drop-zone" id="dropZone" onclick="document.getElementById('hrdFile').click()">
+          <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)">
+          <div class="drop-icon">↑</div>
+          <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">클릭하거나 파일을 드래그</div>
+          <div style="font-size:0.73rem;color:#b0b0c0">xlsx / xls</div>
+        </div>
+      </div>
+      <div class="form-group threshold-group">
+        <label>
+          <span class="label-dot" style="background:var(--yellow)"></span>
+          허용 가능한 차이 설정
+        </label>
+        <div class="threshold-item high">
+          <span class="th-label">HRD가 높을 때</span>
+          <input type="number" id="thresholdHigh" value="5" min="0" max="100" step="0.5" class="th-input">
+          <span class="th-unit">%p 이내 OK</span>
+        </div>
+        <div class="threshold-item low">
+          <span class="th-label">HRD가 낮을 때</span>
+          <input type="number" id="thresholdLow" value="5" min="0" max="100" step="0.5" class="th-input">
+          <span class="th-unit">%p 이내 OK</span>
+        </div>
+        <div class="threshold-hint">
+          <strong>노란색</strong>: HRD가 백오피스보다 위 기준 초과로 높음<br>
+          <strong>빨간색</strong>: HRD가 백오피스보다 위 기준 초과로 낮음
+        </div>
+      </div>
+    </div>
+    <button class="btn-run" onclick="runComparison()">비교 시작</button>
+  </div>
+
+  <div class="card result-section" id="resultSection">
+    <div class="stats-bar" id="statsBar"></div>
+    <div id="hcPanel"></div>
+
+    <div class="result-header">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="result-title" id="resultTitle"></div>
+        <div style="display:flex;gap:6px">
+          <button id="filterAllBtn"   class="filter-btn filter-active" onclick="setFilter('all')">전체 보기</button>
+          <button id="filterAlertBtn" class="filter-btn"               onclick="setFilter('alert')">주의·오류만</button>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn-csv"      onclick="exportCSV()">CSV 내보내기</button>
+        <button class="btn-copy-csv" id="copyCsvBtn" onclick="copyCsvToClipboard()">표 복사하기</button>
+        <button class="btn-slack"    onclick="toggleSlackPanel()">슬랙 전달용 정리!</button>
+      </div>
+    </div>
+
+    <div class="slack-panel" id="slackPanel">
+      <div class="slack-panel-header">
+        <span class="slack-panel-title">슬랙 전달용 정리 (체크 항목만 표시)</span>
+        <div class="slack-panel-actions">
+          <button class="btn-copy-slack" id="copySlackBtn" onclick="copySlackContent()">복사</button>
+          <button class="btn-close-slack" onclick="toggleSlackPanel()">닫기</button>
+        </div>
+      </div>
+      <div class="slack-content" id="slackContent"></div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px">번호</th>
+            <th style="min-width:70px">이름</th>
+            <th style="min-width:78px">주민번호<br>앞자리</th>
+            <th style="min-width:72px">백오피스<br>상태</th>
+            <th style="min-width:72px">HRD<br>상태</th>
+            <th style="min-width:105px">백오피스 출석률</th>
+            <th style="min-width:105px">HRD 출석률</th>
+            <th style="min-width:68px">차이</th>
+            <th style="min-width:65px">판정</th>
+            <th style="min-width:170px">예상 사유</th>
+            <th style="min-width:46px">전달</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let hrdWorkbook = null;
+let comparisonResults = [];
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      hrdWorkbook = XLSX.read(e.target.result, { type: 'binary' });
+      const dz = document.getElementById('dropZone');
+      dz.classList.add('has-file');
+      dz.innerHTML = `
+        <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)" style="display:none">
+        <div class="drop-icon" style="background:rgba(168,230,208,0.3)">✓</div>
+        <div class="file-name">${escH(file.name)}</div>
+        <div style="font-size:0.75rem;color:#3aacac;font-weight:500">로드 완료 · 다시 선택하려면 클릭</div>`;
+      dz.onclick = () => dz.querySelector('input').click();
+    } catch(e) { alert('엑셀 파일 읽기 오류: ' + e.message); }
+  };
+  reader.readAsBinaryString(file);
+}
+
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) { const dt = new DataTransfer(); dt.items.add(f); document.getElementById('hrdFile').files = dt.files; handleFileSelect(document.getElementById('hrdFile')); }
+});
+
+const BO_STATUS_MARKERS = ['조기수료', '중도하차', '중도탈락'];
+const HEADER_COUNT = 14;
+
+function parseBackoffice(raw) {
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (!lines.length) return [];
+  let i = 0;
+  if (lines[0] === '이름') i = HEADER_COUNT;
+  let currentSection = '훈련중';
+  const students = [];
+  while (i < lines.length) {
+    if (BO_STATUS_MARKERS.includes(lines[i].trim())) { currentSection = lines[i].trim(); i++; continue; }
+    const rawName = lines[i++] || '';
+    const name = rawName.replace(/[A-Za-z]/g, '').trim();
+    if (!name || name.length < 2) continue;
+    if (i >= lines.length) break;
+    const phone  = lines[i++] || '';
+    if (i >= lines.length) break;
+    const resNo  = (lines[i++] || '').replace(/[^0-9]/g, '');
+    if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    lines[i++];
+    if (i < lines.length && /^외\s*\d+개/.test(lines[i])) i++;
+    if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    lines[i++]; if (i >= lines.length) break;
+    const attendTotal = lines[i++] || '';
+    if (i >= lines.length) {
+      if (name && resNo.length >= 6) students.push(makeBO(name, resNo, attendTotal, currentSection));
+      break;
+    }
+    lines[i++];
+    if (name && resNo.length >= 6) students.push(makeBO(name, resNo, attendTotal, currentSection));
+  }
+  return students;
+}
+
+function makeBO(name, resNo, attendTotal, boStatus) {
+  const pct  = extractPct(attendTotal);
+  const days = extractDays(attendTotal);
+  return { name, resNo, attendTotal, attendTotalPct: pct, backAttendDays: days.a, backTrainDays: days.t, boStatus };
+}
+
+function mapHrdStatus(s) {
+  if (!s) return '훈련중';
+  if (s === '중도탈락' || s === '조기취업') return '중도하차';
+  if (s === '80%이상수료') return '조기수료';
+  return s;
+}
+
+function parseHRD(wb) {
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const data  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  if (data.length < 3) return [];
+  const hdr = data[0];
+  let nameC=1, resC=2, statC=5, trainC=6, attendC_days=7, attendC_pct=11;
+  for (let j = 0; j < hdr.length; j++) {
+    const h = String(hdr[j]).trim();
+    if (h === '성명')        nameC = j;
+    if (h === '주민등록번호') resC  = j;
+    if (h === '훈련생 상태')  statC = j;
+    if (h === '훈련일수')     trainC = j;
+    if (h === '출석일수')     attendC_days = j;
+    if (h === '출석률 일(%)')  attendC_pct  = j;
+  }
+  const students = [];
+  for (let r = 2; r < data.length; r++) {
+    const row  = data[r];
+    const name = String(row[nameC] || '').replace(/[A-Za-z]/g,'').trim();
+    if (!name || name.length < 2) continue;
+    const resNo      = String(row[resC] || '').replace(/[^0-9]/g,'').substring(0,6);
+    const hrdStatus  = mapHrdStatus(String(row[statC] || '').trim());
+    const trainDays  = parseInt(row[trainC]) || null;
+    const attendDays = parseInt(row[attendC_days]) || null;
+    const pctRaw     = row[attendC_pct];
+    const attend     = (pctRaw !== '' && pctRaw != null) ? parseFloat(pctRaw) : null;
+    students.push({ name, resNo, hrdStatus, trainDays, attendDays, attend });
+  }
+  return students;
+}
+
+function extractPct(s) {
+  const m = String(s||'').match(/(\d+(?:\.\d+)?)\s*%/);
+  return m ? parseFloat(m[1]) : null;
+}
+function extractDays(s) {
+  const m = String(s||'').match(/\((\d+)\/(\d+)일\)/);
+  return m ? { a: parseInt(m[1]), t: parseInt(m[2]) } : { a: null, t: null };
+}
+function makeKey(name, resNo) { return name.replace(/\s/g,'') + '_' + String(resNo).substring(0,6); }
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function runComparison() {
+  const raw = document.getElementById('backofficeInput').value.trim();
+  if (!raw)         { alert('백오피스 수강생 목록을 붙여넣어 주세요.'); return; }
+  if (!hrdWorkbook) { alert('HRD 출석부 엑셀 파일을 업로드해 주세요.');  return; }
+  const thHigh = parseFloat(document.getElementById('thresholdHigh').value) ?? 5;
+  const thLow  = parseFloat(document.getElementById('thresholdLow').value)  ?? 5;
+  const back = parseBackoffice(raw);
+  const hrd  = parseHRD(hrdWorkbook);
+  if (!back.length) { alert('백오피스 데이터를 파싱하지 못했습니다. 붙여넣기 형식을 확인해 주세요.'); return; }
+  const hrdIdx  = {};
+  hrd.forEach(s  => { hrdIdx[makeKey(s.name,  s.resNo)] = s; });
+  const backIdx = {};
+  back.forEach(s => { backIdx[makeKey(s.name, s.resNo)] = s; });
+  const results  = [];
+  const backOnly = [];
+  back.forEach(bs => {
+    const key = makeKey(bs.name, bs.resNo);
+    const h   = hrdIdx[key];
+    if (!h) { backOnly.push(bs.name); results.push({ ...bs, hrdAttend:null, hrdStatus:null, hrdTrainDays:null, hrdAttendDays:null, diff:null, status:'unmatched', reason:'', include:false }); return; }
+    const bPct = bs.attendTotalPct, hPct = h.attend;
+    let status='ok', diff=null;
+    if (bPct !== null && hPct !== null) { diff = hPct - bPct; status = diff > thHigh ? 'yellow' : diff < -thLow ? 'red' : 'ok'; }
+    else { status = 'unmatched'; }
+    results.push({ ...bs, hrdAttend:hPct, hrdStatus:h.hrdStatus, hrdTrainDays:h.trainDays, hrdAttendDays:h.attendDays, diff, status, reason:'', include:false });
+  });
+  const hrdOnlyRows = hrd
+    .filter(s => !backIdx[makeKey(s.name, s.resNo)])
+    .map(s => ({ name: s.name, resNo: s.resNo, boStatus: null, attendTotalPct: null, backAttendDays: null, backTrainDays: null, hrdAttend: s.attend, hrdStatus: s.hrdStatus, hrdTrainDays: s.trainDays, hrdAttendDays: s.attendDays, diff: null, status: 'hrd-only', reason: '', include: false }));
+  comparisonResults = results;
+  renderResults(results, hrdOnlyRows, backOnly, thHigh, thLow, back.length, hrd.length);
+}
+
+function renderResults(results, hrdOnlyRows, backOnly, thHigh, thLow, backTotal, hrdTotal) {
+  document.getElementById('resultSection').style.display = 'block';
+  document.getElementById('slackPanel').classList.remove('active');
+  document.getElementById('resultSection').scrollIntoView({ behavior:'smooth', block:'start' });
+
+  const okCnt  = results.filter(r => r.status === 'ok').length;
+  const yCnt   = results.filter(r => r.status === 'yellow').length;
+  const rCnt   = results.filter(r => r.status === 'red').length;
+  const unmatched   = results.filter(r => r.status === 'unmatched').length;
+  const hrdOnlyCnt  = hrdOnlyRows.length;
+
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card total"><div class="stat-num">${results.length}</div><div class="stat-lbl">개강 시 인원</div></div>
+    <div class="stat-card ok"><div class="stat-num">${okCnt}</div><div class="stat-lbl">OK (허용 범위 이내)</div></div>
+    <div class="stat-card yellow"><div class="stat-num">${yCnt}</div><div class="stat-lbl">주의 (HRD 높음 &gt;${thHigh}%p)</div></div>
+    <div class="stat-card red"><div class="stat-num">${rCnt}</div><div class="stat-lbl">오류 (HRD 낮음 &gt;${thLow}%p)</div></div>
+    <div class="stat-card ${(unmatched+hrdOnlyCnt)>0?'red':'grey'}"><div class="stat-num">${unmatched+hrdOnlyCnt}</div><div class="stat-lbl">미매칭 합계</div></div>`;
+
+  const bo_total = results.length;
+  const bo_exit  = results.filter(r => r.boStatus==='중도하차'||r.boStatus==='중도탈락').length;
+  const bo_early = results.filter(r => r.boStatus==='조기수료').length;
+  const bo_comp  = bo_total - bo_exit - bo_early;
+  const hrd_total = hrdTotal;
+  const allHrdStatuses = [...results.filter(r=>r.hrdStatus).map(r=>r.hrdStatus), ...hrdOnlyRows.map(r=>r.hrdStatus)];
+  const hrd_exit  = allHrdStatuses.filter(s=>s==='중도하차').length;
+  const hrd_early = allHrdStatuses.filter(s=>s==='조기수료').length;
+  const hrd_comp  = allHrdStatuses.filter(s=>s==='훈련중').length;
+
+  function cmpCell(a,b) { return a===b ? `<span class="hc-match">일치</span>` : `<span class="hc-error">불일치 (차이: ${Math.abs(a-b)}명)</span>`; }
+  function numCell(n) { return `<span class="hc-num">${n}명</span>`; }
+
+  document.getElementById('hcPanel').innerHTML = `<div class="card hc-panel">
+    <div class="hc-panel-title">인원 현황 비교</div>
+    <table class="hc-table">
+      <thead><tr><th>구분</th><th>백오피스</th><th>HRD</th><th>비교</th></tr></thead>
+      <tbody>
+        <tr class="hc-row-total"><td>개강 시 인원</td><td>${numCell(bo_total)}</td><td>${numCell(hrd_total)}</td><td>${cmpCell(bo_total,hrd_total)}</td></tr>
+        <tr><td>수료생</td><td>${numCell(bo_comp)}</td><td>${numCell(hrd_comp)}</td><td>${cmpCell(bo_comp,hrd_comp)}</td></tr>
+        <tr><td>조기수료</td><td>${numCell(bo_early)}</td><td>${numCell(hrd_early)}</td><td>${cmpCell(bo_early,hrd_early)}</td></tr>
+        <tr><td>중도하차</td><td>${numCell(bo_exit)}</td><td>${numCell(hrd_exit)}</td><td>${cmpCell(bo_exit,hrd_exit)}</td></tr>
+      </tbody>
+    </table></div>`;
+
+  document.getElementById('resultTitle').textContent = '비교 결과';
+
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+  const unmatchedRows = results.filter(r => r.status==='unmatched');
+  const matchedRows   = results.filter(r => r.status!=='unmatched');
+  const allRows = [];
+  if (unmatchedRows.length || hrdOnlyRows.length) {
+    const totalMis = unmatchedRows.length + hrdOnlyRows.length;
+    allRows.push({ _separator:true, label:`미매칭 인원 (${totalMis}명) — 즉시 확인 필요`, _red:true });
+    unmatchedRows.forEach(r => allRows.push(r));
+    hrdOnlyRows.forEach(r => allRows.push(r));
+    if (matchedRows.length) allRows.push({ _separator:true, label:'매칭된 수강생' });
+  }
+  matchedRows.forEach(r => allRows.push(r));
+  allResultsFlat = allRows.filter(r => !r._separator);
+
+  let dataIdx = -1;
+  allRows.forEach((r) => {
+    if (r._separator) {
+      const sep = document.createElement('tr');
+      const sepBg  = r._red ? '#e03030' : 'rgba(94,206,206,0.12)';
+      const sepClr = r._red ? '#ffffff' : '#4aacac';
+      sep.innerHTML = `<td colspan="11" style="background:${sepBg};color:${sepClr};font-weight:700;font-size:0.78rem;padding:10px 16px;text-align:left;letter-spacing:0.2px;border-radius:0;">${escH(r.label)}</td>`;
+      tbody.appendChild(sep); return;
+    }
+    dataIdx++;
+    const idx = dataIdx;
+    const tr = document.createElement('tr');
+    const isExit  = r.boStatus==='중도하차'||r.boStatus==='중도탈락'||r.hrdStatus==='중도하차';
+    const isEarly = r.boStatus==='조기수료'||r.hrdStatus==='조기수료';
+    tr.className = r.status==='yellow'?'row-yellow': r.status==='red'?'row-red': r.status==='unmatched'?'row-unmatched': r.status==='hrd-only'?'row-hrd-only': isExit?'row-exit': isEarly?'row-early':'row-ok';
+
+    const diffStr   = r.diff!==null ? (r.diff>0?'+':'')+r.diff.toFixed(1)+'%p' : '-';
+    const diffClass = r.status==='yellow'?'diff-yellow': r.status==='red'?'diff-red':'diff-ok';
+    const judgeHtml = r.status==='ok'?'<span class="badge badge-ok">OK</span>'
+                    : r.status==='yellow'?'<span class="badge badge-yellow">주의</span>'
+                    : r.status==='red'?'<span class="badge badge-red">오류</span>'
+                    : r.status==='hrd-only'?'<span class="badge badge-red">백오피스 없음</span>'
+                    : r.status==='unmatched'?'<span class="badge badge-red">HRD 없음</span>'
+                    : '<span class="badge" style="background:#f0f0f4;color:#aaa">-</span>';
+
+    const boB = r.boStatus==='중도하차'||r.boStatus==='중도탈락'
+              ? `<span class="badge badge-exit">중도하차</span>`
+              : r.boStatus==='조기수료'
+              ? `<span class="badge badge-early">조기수료</span>`
+              : `<span style="color:#b0b0c0;font-size:0.75rem">훈련중</span>`;
+
+    const hrdB = !r.hrdStatus ? `<span style="color:#d0d0e0">-</span>`
+               : r.hrdStatus==='중도하차' ? `<span class="badge badge-exit">중도하차</span>`
+               : r.hrdStatus==='조기수료' ? `<span class="badge badge-early">조기수료</span>`
+               : `<span style="color:#b0b0c0;font-size:0.75rem">${escH(r.hrdStatus)}</span>`;
+
+    const needsAction = r.status==='yellow'||r.status==='red'||r.status==='hrd-only'||r.status==='unmatched';
+    const reasonCell  = needsAction ? `<input class="reason-input" type="text" placeholder="예상 사유 입력" oninput="updateReason(${idx},this.value)" value="${escH(r.reason||'')}">` : `<span class="reason-na">-</span>`;
+    const checkCell   = needsAction ? `<input type="checkbox" class="include-check" ${r.include?'checked':''} onchange="updateInclude(${idx},this.checked)">` : '';
+
+    const resDisp  = r.resNo ? r.resNo.substring(0,6) : '-';
+    const bPctStr  = r.attendTotalPct!=null ? r.attendTotalPct.toFixed(1)+'%' : '-';
+    const hPctStr  = r.hrdAttend!=null      ? r.hrdAttend.toFixed(1)+'%'      : '-';
+    const bDaysSub = (r.backAttendDays!=null&&r.backTrainDays!=null&&r.backTrainDays>0) ? `<br><span style="font-size:0.72rem;color:#aaa">(${r.backAttendDays}/${r.backTrainDays}일)</span>` : '';
+    const hDaysSub = (r.hrdAttendDays!=null&&r.hrdTrainDays!=null&&r.hrdTrainDays>0)   ? `<br><span style="font-size:0.72rem;color:#aaa">(${r.hrdAttendDays}/${r.hrdTrainDays}일)</span>`  : '';
+
+    tr.innerHTML = `
+      <td style="color:#b0b0c0;font-size:0.78rem">${idx+1}</td>
+      <td style="font-weight:700">${escH(r.name)}</td>
+      <td style="font-family:monospace;font-size:0.78rem;color:#8a8aaa">${resDisp}</td>
+      <td>${boB}</td>
+      <td>${hrdB}</td>
+      <td>${bPctStr}${bDaysSub}</td>
+      <td>${hPctStr}${hDaysSub}</td>
+      <td class="${diffClass}">${diffStr}</td>
+      <td>${judgeHtml}</td>
+      <td>${reasonCell}</td>
+      <td class="check-cell">${checkCell}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+let allResultsFlat = [];
+function updateReason(idx, v)  { if (allResultsFlat[idx]) allResultsFlat[idx].reason  = v; }
+function updateInclude(idx, v) { if (allResultsFlat[idx]) allResultsFlat[idx].include = v; }
+
+function toggleSlackPanel() {
+  const panel = document.getElementById('slackPanel');
+  const isOpen = panel.classList.contains('active');
+  if (isOpen) { panel.classList.remove('active'); return; }
+  const checked = allResultsFlat.filter(r => r.include);
+  if (!checked.length) { alert('전달할 항목을 테이블에서 체크해 주세요.'); return; }
+  let msg = '';
+  checked.forEach(r => {
+    if (r.status==='unmatched') { msg += `- ${r.name} : 백오피스에는 존재하나 hrd에 존재하지 않음\n`; if (r.reason&&r.reason.trim()) msg += `  - ${r.reason.trim()}\n`; msg += '\n'; return; }
+    if (r.status==='hrd-only')  { msg += `- ${r.name} : hrd에 존재하나 백오피스에 존재하지 않음\n`;  if (r.reason&&r.reason.trim()) msg += `  - ${r.reason.trim()}\n`; msg += '\n'; return; }
+    const absDiff    = r.diff!=null ? Math.abs(r.diff).toFixed(1) : '?';
+    const signedDiff = r.diff!=null ? (r.diff>0?'+':'')+r.diff.toFixed(1)+'%' : '?';
+    const bPct  = r.attendTotalPct!=null ? r.attendTotalPct.toFixed(0) : '?';
+    const hPct  = r.hrdAttend!=null      ? r.hrdAttend.toFixed(0)      : '?';
+    const bDays = (r.backAttendDays!=null&&r.backTrainDays!=null) ? `${r.backAttendDays}/${r.backTrainDays}일` : '-';
+    const hDays = (r.hrdAttendDays!=null &&r.hrdTrainDays!=null)  ? `${r.hrdAttendDays}/${r.hrdTrainDays}일`  : '-';
+    msg += `- ${r.name} : ${absDiff}% 차이\n  - 백오피스 : ${bPct}% / (${bDays})\n  - hrd : ${hPct}% / (${hDays})\n  - 차이 : ${signedDiff}\n`;
+    if (r.reason&&r.reason.trim()) msg += `  - ${r.reason.trim()}\n`;
+    msg += '\n';
+  });
+  document.getElementById('slackContent').textContent = msg.trimEnd();
+  document.getElementById('copySlackBtn').textContent = '복사';
+  document.getElementById('copySlackBtn').className   = 'btn-copy-slack';
+  panel.classList.add('active');
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function copySlackContent() {
+  const text = document.getElementById('slackContent').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copySlackBtn');
+    btn.textContent='복사 완료!'; btn.className='btn-copy-slack copied';
+    setTimeout(() => { btn.textContent='복사'; btn.className='btn-copy-slack'; }, 2000);
+  }).catch(() => { selectText('slackContent'); alert('Ctrl+C로 복사해 주세요.'); });
+}
+
+function buildTableData() {
+  const headers = ['번호','이름','주민번호앞자리','백오피스상태','HRD상태','백오피스출석률(%)','백오피스출석일수','백오피스훈련일수','HRD출석률(%)','HRD출석일수','HRD훈련일수','차이(%p)','판정','예상사유'];
+  const rows = allResultsFlat.map((r,i) => {
+    const st = r.status==='ok'?'OK': r.status==='yellow'?'주의(HRD높음)': r.status==='red'?'오류(HRD낮음)': r.status==='hrd-only'?'HRD만존재':'미매칭';
+    return [i+1,r.name,r.resNo?r.resNo.substring(0,6):'',r.boStatus||'',r.hrdStatus||'',r.attendTotalPct!=null?r.attendTotalPct.toFixed(1):'',r.backAttendDays??'',r.backTrainDays??'',r.hrdAttend!=null?r.hrdAttend.toFixed(1):'',r.hrdAttendDays??'',r.hrdTrainDays??'',r.diff!=null?r.diff.toFixed(1):'',st,r.reason||''];
+  });
+  return { headers, rows };
+}
+
+function exportCSV() {
+  if (!allResultsFlat.length) { alert('먼저 비교를 실행하세요.'); return; }
+  const { headers, rows } = buildTableData();
+  const csv = [headers, ...rows].map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  const d = new Date();
+  a.download = `수료보고_출석률비교_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function copyCsvToClipboard() {
+  if (!allResultsFlat.length) { alert('먼저 비교를 실행하세요.'); return; }
+  const { headers, rows } = buildTableData();
+  const tsv = [headers, ...rows].map(row => row.map(c => String(c)).join('\t')).join('\n');
+  navigator.clipboard.writeText(tsv).then(() => {
+    const btn = document.getElementById('copyCsvBtn');
+    btn.textContent='복사 완료!'; btn.className='btn-copy-csv copied';
+    setTimeout(() => { btn.textContent='표 복사하기'; btn.className='btn-copy-csv'; }, 2000);
+  }).catch(() => { alert('복사에 실패했습니다. CSV 내보내기를 이용해 주세요.'); });
+}
+
+let currentFilter = 'all';
+function setFilter(mode) {
+  currentFilter = mode;
+  document.getElementById('filterAllBtn').className   = 'filter-btn' + (mode==='all'   ? ' filter-active' : '');
+  document.getElementById('filterAlertBtn').className = 'filter-btn' + (mode==='alert' ? ' filter-active' : '');
+  document.querySelectorAll('#resultBody tr').forEach(tr => {
+    if (tr.children.length === 1) { tr.style.display = mode==='alert' ? 'none' : ''; return; }
+    if (mode==='alert') {
+      const isAlert     = tr.querySelector('.badge-yellow, .badge-red');
+      const isUnmatched = tr.classList.contains('row-unmatched') || tr.classList.contains('row-hrd-only');
+      tr.style.display = (isAlert||isUnmatched) ? '' : 'none';
+    } else { tr.style.display = ''; }
+  });
+}
+
+function selectText(id) {
+  const el = document.getElementById(id);
+  const r  = document.createRange(); r.selectNodeContents(el);
+  const s  = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+</script>
+</body>
+</html>
