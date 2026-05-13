@@ -473,7 +473,7 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
         <div class="guide-step">
           <div class="guide-step-num">Step 1</div>
           <div class="guide-step-title">백오피스 붙여넣기</div>
-          <div class="guide-step-desc">백오피스 수강생 관리 화면에서 표 전체를 복사(Ctrl+A → Ctrl+C)한 뒤 왼쪽 칸에 붙여넣습니다. 헤더 포함 여부 무관, 조기수료·중도하차 포함해도 됩니다.</div>
+          <div class="guide-step-desc">트랙 출결 방식에 맞는 버튼을 먼저 선택합니다. QR 출석 트랙은 <strong>QR 출결 트랙</strong>, 자체 출결 또는 QR과 병행 운영하는 트랙은 <strong>자체출결 / QR병행 트랙</strong>을 선택하세요. 이후 백오피스 수강생 관리 화면에서 표 전체를 복사(Ctrl+A → Ctrl+C)한 뒤 왼쪽 칸에 붙여넣습니다. 헤더 포함 여부 무관, 조기수료·중도하차 포함해도 됩니다.</div>
         </div>
         <div class="guide-step">
           <div class="guide-step-num">Step 2</div>
@@ -504,11 +504,9 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
     <div class="mode-toggle-row">
       <button class="mode-btn active" id="modeQR" onclick="setMode('qr')">
         <span class="mode-btn-name">QR 출결 트랙</span>
-        <span class="mode-btn-desc">Unreal / AI 등 QR 기반 트랙</span>
       </button>
       <button class="mode-btn" id="modeSelf" onclick="setMode('self')">
-        <span class="mode-btn-name">자체 출결 트랙</span>
-        <span class="mode-btn-desc">❌ 마커 포함, 출석률 4개 필드</span>
+        <span class="mode-btn-name">자체출결 / QR병행 트랙</span>
       </button>
     </div>
     <div class="form-row">
