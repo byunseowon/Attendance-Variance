@@ -376,25 +376,6 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
 }
 
 /* ── 트랙 모드 토글 ─────────────────────────────── */
-.mode-toggle-row {
-  display: flex; gap: 8px; margin-bottom: 20px;
-}
-.mode-btn {
-  flex: 1; padding: 11px 0; border-radius: 14px;
-  border: 2px solid rgba(94,206,206,0.2);
-  background: #faf5f3; font-size: 0.82rem; font-weight: 700;
-  color: var(--sub); cursor: pointer; font-family: inherit;
-  transition: all 0.18s; display: flex; flex-direction: column;
-  align-items: center; gap: 3px;
-}
-.mode-btn .mode-btn-name { font-size: 0.88rem; color: var(--text); }
-.mode-btn .mode-btn-desc { font-size: 0.72rem; font-weight: 500; color: var(--sub); }
-.mode-btn.active {
-  background: linear-gradient(135deg, rgba(94,206,206,0.12), rgba(94,206,206,0.06));
-  border-color: var(--teal);
-  box-shadow: 0 2px 10px rgba(94,206,206,0.2);
-}
-.mode-btn.active .mode-btn-name { color: var(--teal-d); }
 
 /* ── 사용법 카드 ─────────────────────────────────── */
 .guide-card { overflow: hidden; }
@@ -473,7 +454,7 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
         <div class="guide-step">
           <div class="guide-step-num">Step 1</div>
           <div class="guide-step-title">백오피스 붙여넣기</div>
-          <div class="guide-step-desc">트랙 출결 방식에 맞는 버튼을 먼저 선택합니다. QR 출석 트랙은 <strong>QR 출결 트랙</strong>, 자체 출결 또는 QR과 병행 운영하는 트랙은 <strong>자체출결 / QR병행 트랙</strong>을 선택하세요. 이후 백오피스 수강생 관리 화면에서 표 전체를 복사(Ctrl+A → Ctrl+C)한 뒤 왼쪽 칸에 붙여넣습니다. 헤더 포함 여부 무관, 조기수료·중도하차 포함해도 됩니다.</div>
+          <div class="guide-step-desc">백오피스 수강생 관리 화면에서 <strong>출결 상세 펼치기</strong>를 먼저 클릭해 출결 데이터를 펼친 뒤, 헤더 행을 포함하여 표 전체를 복사(Ctrl+A → Ctrl+C)해 왼쪽 칸에 붙여넣습니다. 조기수료·중도하차 수강생도 함께 붙여넣어도 됩니다.</div>
         </div>
         <div class="guide-step">
           <div class="guide-step-num">Step 2</div>
@@ -501,14 +482,7 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
 
   <div class="card input-section">
     <div class="section-label">데이터 입력</div>
-    <div class="mode-toggle-row">
-      <button class="mode-btn active" id="modeQR" onclick="setMode('qr')">
-        <span class="mode-btn-name">QR 출결 트랙</span>
-      </button>
-      <button class="mode-btn" id="modeSelf" onclick="setMode('self')">
-        <span class="mode-btn-name">자체출결 / QR병행 트랙</span>
-      </button>
-    </div>
+
     <div class="form-row">
       <div class="form-group">
         <label>
@@ -648,29 +622,25 @@ dz.addEventListener('drop', e => {
 
 const BO_STATUS_MARKERS = ['조기수료', '중도하차', '중도탈락'];
 const HEADER_COUNT = 14;
-
-let boMode = 'qr'; // 'qr' | 'self'
-function setMode(m) {
-  boMode = m;
-  document.getElementById('modeQR').classList.toggle('active',   m === 'qr');
-  document.getElementById('modeSelf').classList.toggle('active',  m === 'self');
-}
+let boOnlyUnitPct = false;
 
 function parseBackoffice(raw) {
+  boOnlyUnitPct = false;
   const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   if (!lines.length) return [];
   let i = 0;
-  if (lines[0] === '이름') i = HEADER_COUNT;
-  const isSelf = boMode === 'self';
+  if (lines[0] === '본인인증') {
+    // 자체출결: 헤더 줄 수에 관계없이 첫 ❌(본인인증 필드)까지 스킵
+    while (i < lines.length && lines[i] !== '❌') i++;
+  } else if (lines[0] === '이름') {
+    i = HEADER_COUNT; // QR 헤더 14줄 스킵
+  }
   let currentSection = '훈련중';
   const students = [];
 
   while (i < lines.length) {
     // 구분자 (중도하차, 조기수료 등)
     if (BO_STATUS_MARKERS.includes(lines[i].trim())) { currentSection = lines[i].trim(); i++; continue; }
-
-    // 자체 출결: ❌ 구분자 건너뛰기
-    if (isSelf && lines[i] === '❌') { i++; continue; }
 
     // 이름
     const rawName = lines[i++] || '';
@@ -694,20 +664,14 @@ function parseBackoffice(raw) {
     lines[i++]; if (i >= lines.length) break; // comment
     lines[i++]; if (i >= lines.length) break; // contactNeeded / ❌필드
 
-    let attendTotal = '';
-    if (isSelf) {
-      // 자체 출결: NaN% 2개(단위기간) 스킵 → 3번째 %가 훈련기간 출석률
-      lines[i++]; if (i >= lines.length) break; // attendUnit NaN%
-      lines[i++]; if (i >= lines.length) break; // absentUnit NaN%
-      attendTotal = lines[i++] || '';
-      if (i >= lines.length) { if (name && resNo.length >= 6) students.push(makeBO(name, resNo, attendTotal, currentSection)); break; }
-      lines[i++]; // absentTotal
-    } else {
-      // QR: 다음 줄이 바로 출석률
-      attendTotal = lines[i++] || '';
-      if (i >= lines.length) { if (name && resNo.length >= 6) students.push(makeBO(name, resNo, attendTotal, currentSection)); break; }
-      lines[i++]; // absentTotal
+    // % 필드 동적 소비: 2개(단위기간만) or 4개(훈련기간 포함) 모두 처리
+    const pctLines = [];
+    while (i < lines.length && /^(?:NaN|\d+)%/.test(lines[i])) {
+      pctLines.push(lines[i++]);
     }
+    if (pctLines.length < 3) boOnlyUnitPct = true;
+    // 4개: pctLines[2] = 출석률(훈련기간) / 2개: pctLines[0] = 출석률(단위기간)
+    let attendTotal = pctLines.length >= 3 ? pctLines[2] : (pctLines[0] || '');
 
     if (name && resNo.length >= 6) students.push(makeBO(name, resNo, attendTotal, currentSection));
   }
@@ -778,6 +742,7 @@ function runComparison() {
   const back = parseBackoffice(raw);
   const hrd  = parseHRD(hrdWorkbook);
   if (!back.length) { alert('백오피스 데이터를 파싱하지 못했습니다. 붙여넣기 형식을 확인해 주세요.'); return; }
+  if (boOnlyUnitPct) { alert('훈련기간 출석률이 없습니다.\n백오피스에서 [출결 상세 펼치기]를 클릭한 후 다시 복사해 주세요.'); return; }
   const hrdIdx  = {};
   hrd.forEach(s  => { hrdIdx[makeKey(s.name,  s.resNo)] = s; });
   const backIdx = {};
