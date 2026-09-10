@@ -97,6 +97,20 @@ body {
 
 .form-row { display: grid; grid-template-columns: 1fr 1fr 300px; gap: 24px; margin-bottom: 24px; }
 .form-group { display: flex; flex-direction: column; gap: 10px; }
+.redash-config-grid { display: grid; grid-template-columns: 1.2fr 0.8fr 0.8fr 1.2fr; gap: 14px; margin-bottom: 16px; }
+.redash-config-actions { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.redash-status { color: var(--sub); font-size: 0.78rem; }
+.btn-load-catalog { width: auto; padding: 13px 22px; font-size: 0.85rem; }
+.text-input, .select-input {
+  width: 100%; padding: 13px 14px; border: 2px solid transparent; border-radius: 12px;
+  font-size: 0.84rem; font-family: inherit; background: #faf5f3; color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.text-input:focus, .select-input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px rgba(94,206,206,0.15); background: #fff; }
+.select-input:disabled { color: #b8b4c0; cursor: not-allowed; }
+.selection-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+.threshold-inline { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 12px; align-items: center; }
+.threshold-title { color: var(--sub); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
 
 label {
   font-size: 0.75rem; font-weight: 700; color: var(--sub);
@@ -453,18 +467,18 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
       <div class="guide-steps">
         <div class="guide-step">
           <div class="guide-step-num">Step 1</div>
-          <div class="guide-step-title">백오피스 붙여넣기</div>
-          <div class="guide-step-desc">백오피스 수강생 관리 화면에서 <strong>출결 상세 펼치기</strong>를 먼저 클릭해 출결 데이터를 펼친 뒤, 헤더 행을 포함하여 표 전체를 복사(Ctrl+A → Ctrl+C)해 왼쪽 칸에 붙여넣습니다. 조기수료·중도하차 수강생도 함께 붙여넣어도 됩니다.</div>
+          <div class="guide-step-title">Redash 연결</div>
+          <div class="guide-step-desc">Redash에서 현재 운영 중인 트랙과 기수 목록을 자동으로 불러옵니다. 사용자는 별도 설정 없이 드롭다운에서 선택합니다.</div>
         </div>
         <div class="guide-step">
           <div class="guide-step-num">Step 2</div>
           <div class="guide-step-title">HRD 출석부 업로드</div>
-          <div class="guide-step-desc">HRD-Net에서 내보낸 출석부 엑셀(.xlsx / .xls)을 가운데 영역에 클릭 또는 드래그로 올립니다. 첫 번째 시트의 데이터를 자동으로 읽습니다.</div>
+          <div class="guide-step-desc">HRD-Net에서 내보낸 출석부 엑셀(.xlsx / .xls)을 업로드합니다. 첫 번째 시트의 데이터를 자동으로 읽고, Redash 조회 결과와 자동 비교합니다.</div>
         </div>
         <div class="guide-step">
           <div class="guide-step-num">Step 3</div>
-          <div class="guide-step-title">기준 설정 후 비교 시작</div>
-          <div class="guide-step-desc">오른쪽에서 허용 가능한 차이(%p)를 설정합니다. 기본값은 5%p. 설정 후 <strong>비교 시작</strong> 버튼을 클릭하면 결과가 바로 표시됩니다.</div>
+          <div class="guide-step-title">트랙·기수 선택</div>
+          <div class="guide-step-desc">트랙을 먼저 선택하면 해당 트랙의 과거 및 현재 기수만 표시됩니다. 기수를 선택하면 Redash 출결 데이터가 자동으로 조회됩니다. HRD 엑셀을 올리면 비교 결과가 자동으로 표시됩니다.</div>
         </div>
       </div>
       <div class="guide-badges-title">판정 기준</div>
@@ -481,21 +495,24 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
   </div>
 
   <div class="card input-section">
-    <div class="section-label">데이터 입력</div>
+    <div class="section-label">Redash 데이터 연결</div>
+
+    <div class="redash-config-actions">
+      <span class="redash-status" id="redashStatus">트랙 목록을 불러오는 중입니다.</span>
+    </div>
 
     <div class="form-row">
       <div class="form-group">
-        <label>
-          <span class="label-dot" style="background:var(--teal)"></span>
-          백오피스 수강생 목록
-        </label>
-        <textarea id="backofficeInput" placeholder="백오피스에서 표 전체 복사 후 붙여넣으세요.&#10;헤더 포함 여부 상관없이 자동 파싱됩니다.&#10;조기수료 / 중도하차 수강생도 함께 붙여넣어도 됩니다."></textarea>
+        <label><span class="label-dot" style="background:var(--lavender)"></span>트랙 및 기수 선택</label>
+        <select class="select-input" id="trackSelect" disabled>
+          <option value="">트랙 목록을 불러오는 중입니다</option>
+        </select>
+        <select class="select-input" id="cohortSelect" disabled>
+          <option value="">트랙을 먼저 선택해 주세요</option>
+        </select>
       </div>
       <div class="form-group">
-        <label>
-          <span class="label-dot" style="background:var(--coral)"></span>
-          HRD 출석부 엑셀
-        </label>
+        <label><span class="label-dot" style="background:var(--coral)"></span>HRD 출석부 엑셀</label>
         <div class="file-drop-zone" id="dropZone" onclick="document.getElementById('hrdFile').click()">
           <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)">
           <div class="drop-icon">↑</div>
@@ -504,10 +521,7 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
         </div>
       </div>
       <div class="form-group threshold-group">
-        <label>
-          <span class="label-dot" style="background:var(--yellow)"></span>
-          허용 가능한 차이 설정
-        </label>
+        <label><span class="label-dot" style="background:var(--yellow)"></span>허용 가능한 차이 설정</label>
         <div class="threshold-item high">
           <span class="th-label">HRD가 높을 때</span>
           <input type="number" id="thresholdHigh" value="5" min="0" max="100" step="0.5" class="th-input">
@@ -519,12 +533,11 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
           <span class="th-unit">%p 이내 OK</span>
         </div>
         <div class="threshold-hint">
-          <strong>노란색</strong>: HRD가 백오피스보다 위 기준 초과로 높음<br>
-          <strong>빨간색</strong>: HRD가 백오피스보다 위 기준 초과로 낮음
+          <strong>노란색</strong>: HRD가 Redash 출석률보다 높음<br>
+          <strong>빨간색</strong>: HRD가 Redash 출석률보다 낮음
         </div>
       </div>
     </div>
-    <button class="btn-run" onclick="runComparison()">비교 시작</button>
   </div>
 
   <div class="card result-section" id="resultSection">
@@ -583,6 +596,10 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
 <script>
 let hrdWorkbook = null;
 let comparisonResults = [];
+let redashStudents = [];
+let redashCatalog = [];
+let selectedCohortId = '';
+let allResultsFlat = [];
 
 function toggleGuide() {
   const card = document.getElementById('guideCard');
@@ -606,6 +623,7 @@ function handleFileSelect(input) {
         <div class="file-name">${escH(file.name)}</div>
         <div style="font-size:0.75rem;color:#3aacac;font-weight:500">로드 완료 · 다시 선택하려면 클릭</div>`;
       dz.onclick = () => dz.querySelector('input').click();
+      runComparison();
     } catch(e) { alert('엑셀 파일 읽기 오류: ' + e.message); }
   };
   reader.readAsBinaryString(file);
@@ -619,6 +637,9 @@ dz.addEventListener('drop', e => {
   const f = e.dataTransfer.files[0];
   if (f) { const dt = new DataTransfer(); dt.items.add(f); document.getElementById('hrdFile').files = dt.files; handleFileSelect(document.getElementById('hrdFile')); }
 });
+
+document.getElementById('trackSelect').addEventListener('change', handleTrackChange);
+document.getElementById('cohortSelect').addEventListener('change', loadCohortDetails);
 
 const BO_STATUS_MARKERS = ['조기수료', '중도하차', '중도탈락'];
 const HEADER_COUNT = 14;
@@ -688,6 +709,7 @@ function mapHrdStatus(s) {
   if (!s) return '훈련중';
   if (s === '중도탈락' || s === '조기취업') return '중도하차';
   if (s === '80%이상수료') return '조기수료';
+  if (s === '수료') return '일반 수료';
   return s;
 }
 
@@ -733,18 +755,149 @@ function extractDays(s) {
 function makeKey(name, resNo) { return name.replace(/\s/g,'') + '_' + String(resNo).substring(0,6); }
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+function redashValue(row, ...names) {
+  for (const name of names) {
+    if (row && row[name] !== undefined && row[name] !== null) return row[name];
+  }
+  return '';
+}
+
+function redashRows(payload) {
+  const data = payload?.query_result?.data || payload?.data || payload;
+  if (!data) return [];
+  if (Array.isArray(data.rows)) {
+    if (data.rows.length && Array.isArray(data.rows[0]) && Array.isArray(data.columns)) {
+      return data.rows.map(values => Object.fromEntries(data.columns.map((column, i) => [column.name, values[i]])));
+    }
+    return data.rows;
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+function setRedashStatus(message, isError = false) {
+  const el = document.getElementById('redashStatus');
+  el.textContent = message;
+  el.style.color = isError ? '#e03030' : 'var(--sub)';
+}
+
+async function fetchApiRows(path) {
+  const response = await fetch(path, { headers: { Accept: 'application/json' } });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `데이터 조회 실패 (${response.status})`);
+  return redashRows(payload);
+}
+
+function normalizeCatalogRow(row) {
+  const cohortId = String(redashValue(row, 'cohort_id', '_id')).trim();
+  const trackId = String(redashValue(row, 'track_id', 'courseid')).trim();
+  const title = String(redashValue(row, 'cohort_title', 'title')).trim();
+  const trackName = String(redashValue(row, 'track_name')).trim() || title.replace(/\s+\d+회차\s*$/, '').trim();
+  const startDate = redashValue(row, 'startdate', 'start_date');
+  if (!cohortId || !trackId || !title) return null;
+  return {
+    cohortId,
+    trackId,
+    trackName,
+    title,
+    cohortnum: redashValue(row, 'cohortnum', 'cohort_num'),
+    startDate,
+    endDate: redashValue(row, 'enddate', 'end_date')
+  };
+}
+
+function formatDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).substring(0, 10);
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+}
+
+async function loadRedashCatalog() {
+  setRedashStatus('트랙 목록을 불러오는 중입니다.');
+  try {
+    const rows = await fetchApiRows('/api/cohorts');
+    const now = Date.now();
+    redashCatalog = rows.map(normalizeCatalogRow).filter(row => {
+      if (!row) return false;
+      const start = new Date(row.startDate).getTime();
+      return Number.isNaN(start) || start <= now;
+    });
+    const tracks = [...new Map(redashCatalog.map(row => [row.trackId, row])).values()]
+      .sort((a, b) => a.trackName.localeCompare(b.trackName, 'ko'));
+    const trackSelect = document.getElementById('trackSelect');
+    const cohortSelect = document.getElementById('cohortSelect');
+    trackSelect.innerHTML = '<option value="">트랙을 선택해 주세요</option>' + tracks
+      .map(track => `<option value="${escH(track.trackId)}">${escH(track.trackName)}</option>`).join('');
+    trackSelect.disabled = tracks.length === 0;
+    cohortSelect.innerHTML = '<option value="">트랙을 먼저 선택해 주세요</option>';
+    cohortSelect.disabled = true;
+    setRedashStatus(`${tracks.length}개 트랙, ${redashCatalog.length}개 기수를 불러왔습니다.`);
+  } catch (error) {
+    redashCatalog = [];
+    setRedashStatus(error.message, true);
+  }
+}
+
+function handleTrackChange() {
+  const trackId = document.getElementById('trackSelect').value;
+  const cohortSelect = document.getElementById('cohortSelect');
+  const cohorts = redashCatalog.filter(row => row.trackId === trackId)
+    .sort((a, b) => Number(a.cohortnum) - Number(b.cohortnum));
+  cohortSelect.innerHTML = '<option value="">기수를 선택해 주세요</option>' + cohorts
+    .map(row => `<option value="${escH(row.cohortId)}">${escH(row.cohortnum)}회차 | ${escH(formatDate(row.startDate))} ~ ${escH(formatDate(row.endDate))}</option>`).join('');
+  cohortSelect.disabled = !trackId || cohorts.length === 0;
+  selectedCohortId = '';
+  redashStudents = [];
+  document.getElementById('resultSection').style.display = 'none';
+  setRedashStatus(trackId ? `${cohorts.length}개 기수를 선택할 수 있습니다.` : '트랙을 선택해 주세요.');
+}
+
+function normalizeDetailRow(row) {
+  const name = String(redashValue(row, 'name', 'trainee_name')).replace(/[A-Za-z]/g, '').trim();
+  const resNo = String(redashValue(row, 'dateofbirth', 'res_no', 'resident_number')).replace(/[^0-9]/g, '').substring(0, 6);
+  const attendanceDays = Number(redashValue(row, 'attendance_days', 'attendancedays'));
+  const elapsedDays = Number(redashValue(row, 'elapsed_days', 'elapsedDays'));
+  const trainingDays = Number(redashValue(row, 'training_days', 'total_days', 'totaldays'));
+  let pct = Number(redashValue(row, 'attendance_rate', 'attendance_pct'));
+  const denominator = elapsedDays || trainingDays;
+  if (!Number.isFinite(pct)) pct = denominator > 0 ? attendanceDays * 100 / denominator : null;
+  else if (pct > 0 && pct <= 1) pct *= 100;
+  return {
+    name,
+    resNo,
+    boStatus: String(redashValue(row, 'mapped_status', 'status')).trim() || '훈련중',
+    attendTotalPct: Number.isFinite(pct) ? pct : null,
+    backAttendDays: Number.isFinite(attendanceDays) ? attendanceDays : null,
+    backTrainDays: denominator || null,
+    sourceTrainingDays: Number.isFinite(trainingDays) ? trainingDays : null,
+    elapsedDays: Number.isFinite(elapsedDays) ? elapsedDays : null
+  };
+}
+
+async function loadCohortDetails() {
+  const cohortId = document.getElementById('cohortSelect').value;
+  if (!cohortId) return;
+  selectedCohortId = cohortId;
+  setRedashStatus('선택한 기수의 수강생 출결을 불러오는 중입니다.');
+  try {
+    const rows = await fetchApiRows(`/api/attendance?cohort_id=${encodeURIComponent(cohortId)}`);
+    redashStudents = rows.map(normalizeDetailRow).filter(row => row.name && row.resNo.length >= 6);
+    setRedashStatus(`${redashStudents.length}명의 출결 데이터를 불러왔습니다.`);
+    runComparison();
+  } catch (error) {
+    redashStudents = [];
+    setRedashStatus(error.message, true);
+  }
+}
+
 function runComparison() {
-  const raw = document.getElementById('backofficeInput').value.trim();
-  if (!raw)         { alert('백오피스 수강생 목록을 붙여넣어 주세요.'); return; }
-  if (!hrdWorkbook) { alert('HRD 출석부 엑셀 파일을 업로드해 주세요.');  return; }
+  if (!redashStudents.length || !hrdWorkbook) return;
   const thHigh = parseFloat(document.getElementById('thresholdHigh').value) ?? 5;
   const thLow  = parseFloat(document.getElementById('thresholdLow').value)  ?? 5;
-  const back = parseBackoffice(raw);
+  const back = redashStudents;
   const hrd  = parseHRD(hrdWorkbook);
-  if (!back.length) { alert('백오피스 데이터를 파싱하지 못했습니다. 붙여넣기 형식을 확인해 주세요.'); return; }
-  if (boOnlyUnitPct) { alert('훈련기간 출석률이 없습니다.\n백오피스에서 [출결 상세 펼치기]를 클릭한 후 다시 복사해 주세요.'); return; }
   const hrdIdx  = {};
-  hrd.forEach(s  => { hrdIdx[makeKey(s.name,  s.resNo)] = s; });
+  hrd.forEach(s  => { hrdIdx[makeKey(s.name, s.resNo)] = s; });
   const backIdx = {};
   back.forEach(s => { backIdx[makeKey(s.name, s.resNo)] = s; });
   const results  = [];
@@ -792,7 +945,7 @@ function renderResults(results, hrdOnlyRows, backOnly, thHigh, thLow, backTotal,
   const allHrdStatuses = [...results.filter(r=>r.hrdStatus).map(r=>r.hrdStatus), ...hrdOnlyRows.map(r=>r.hrdStatus)];
   const hrd_exit  = allHrdStatuses.filter(s=>s==='중도하차').length;
   const hrd_early = allHrdStatuses.filter(s=>s==='조기수료').length;
-  const hrd_comp  = allHrdStatuses.filter(s=>s==='훈련중').length;
+  const hrd_comp  = allHrdStatuses.filter(s=>s==='훈련중'||s==='일반 수료').length;
 
   function cmpCell(a,b) { return a===b ? `<span class="hc-match">일치</span>` : `<span class="hc-error">불일치 (차이: ${Math.abs(a-b)}명)</span>`; }
   function numCell(n) { return `<span class="hc-num">${n}명</span>`; }
@@ -855,11 +1008,14 @@ function renderResults(results, hrdOnlyRows, backOnly, thHigh, thLow, backTotal,
               ? `<span class="badge badge-exit">중도하차</span>`
               : r.boStatus==='조기수료'
               ? `<span class="badge badge-early">조기수료</span>`
+              : r.boStatus==='일반 수료'
+              ? `<span class="badge badge-grad">일반 수료</span>`
               : `<span style="color:#b0b0c0;font-size:0.75rem">훈련중</span>`;
 
     const hrdB = !r.hrdStatus ? `<span style="color:#d0d0e0">-</span>`
                : r.hrdStatus==='중도하차' ? `<span class="badge badge-exit">중도하차</span>`
                : r.hrdStatus==='조기수료' ? `<span class="badge badge-early">조기수료</span>`
+               : r.hrdStatus==='일반 수료' ? `<span class="badge badge-grad">일반 수료</span>`
                : `<span style="color:#b0b0c0;font-size:0.75rem">${escH(r.hrdStatus)}</span>`;
 
     const needsAction = r.status==='yellow'||r.status==='red'||r.status==='hrd-only'||r.status==='unmatched';
@@ -888,7 +1044,6 @@ function renderResults(results, hrdOnlyRows, backOnly, thHigh, thLow, backTotal,
   });
 }
 
-let allResultsFlat = [];
 function updateReason(idx, v)  { if (allResultsFlat[idx]) allResultsFlat[idx].reason  = v; }
 function updateInclude(idx, v) { if (allResultsFlat[idx]) allResultsFlat[idx].include = v; }
 
@@ -981,6 +1136,8 @@ function selectText(id) {
   const r  = document.createRange(); r.selectNodeContents(el);
   const s  = window.getSelection(); s.removeAllRanges(); s.addRange(r);
 }
+
+loadRedashCatalog();
 </script>
 </body>
 </html>

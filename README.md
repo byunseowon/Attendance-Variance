@@ -39,13 +39,13 @@
 
 ## 사용 방법
 
-### 1단계 — 백오피스 수강생 목록 붙여넣기
+### 1단계 — 트랙과 기수 선택
 
-백오피스 수강생 관리 화면에서 표 전체를 선택 후 복사하여 좌측 텍스트 영역에 붙여넣습니다.
+Redash에서 실제 시작한 트랙 목록을 자동으로 불러옵니다. 트랙을 선택하면 해당 트랙의 과거 및 현재 기수만 표시되며, 기수를 선택하면 수강생 출결 데이터가 자동으로 조회됩니다.
 
-- 헤더 행 포함 여부에 관계없이 자동 파싱됩니다.
-- 조기수료·중도하차 수강생도 함께 붙여넣어도 무방합니다. 섹션 구분자를 자동으로 인식합니다.
-- 파싱 대상 항목: 이름, 주민번호, 출석률(훈련기간)
+- 미래 시작 기수는 선택 목록에서 제외합니다.
+- 수강생 데이터는 `dblms_trainees`와 `dblms_trainee_attendance_summaries`에서 조회합니다.
+- 일반 수료와 조기수료는 `statuslogs`의 최근 사유를 기준으로 구분합니다.
 
 ### 2단계 — HRD 출석부 엑셀 업로드
 
@@ -154,10 +154,10 @@ HRD-Net에서 내보낸 출석부 파일(`.xlsx` 또는 `.xls`)을 업로드합�
 
 | 항목 | 내용 |
 | --- | --- |
-| 구현 방식 | 단일 HTML 파일 (서버·설치 불필요) |
+| 구현 방식 | Vercel 정적 페이지 + Serverless API |
 | 외부 라이브러리 | [SheetJS (xlsx) v0.18.5](https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js) — 엑셀 파싱용 |
 | 브라우저 요구사항 | Chrome, Edge, Safari 최신 버전 권장 (Clipboard API 사용) |
-| 데이터 보안 | 모든 처리는 브라우저 로컬에서 수행, 외부 서버 전송 없음 |
+| 데이터 보안 | Vercel Serverless API가 Redash를 조회하며, API 키는 Vercel 환경변수로 관리 |
 
 ---
 
@@ -167,3 +167,21 @@ HRD-Net에서 내보낸 출석부 파일(`.xlsx` 또는 `.xls`)을 업로드합�
 - HRD 엑셀의 첫 번째 시트가 출석부 데이터여야 합니다. 첫 행은 헤더(성명, 주민등록번호 등)로 인식됩니다.
 - 이름에 포함된 영문자는 자동으로 제거 후 매칭합니다 (예: `홍길동A` → `홍길동`).
 - 매칭 기준은 이름 + 주민번호 앞 6자리이므로, 동명이인이 있을 경우 주민번호를 반드시 확인하십시오.
+
+---
+
+## Vercel 배포 설정
+
+사용자는 설정값을 입력하지 않습니다. Redash 연결 정보는 Vercel Serverless API에서 관리합니다.
+
+1. `redash-queries.sql`의 두 쿼리를 Redash에 저장합니다.
+2. 트랙·기수 목록 쿼리 ID는 `7982`, 출결 상세 쿼리 ID는 `7983`입니다.
+3. Vercel 프로젝트의 Environment Variables에 아래 값을 등록합니다.
+   - `REDASH_URL`: Redash 기본 주소
+   - `REDASH_CATALOG_QUERY_ID`: `7982`
+   - `REDASH_CATALOG_API_KEY`: 7982 쿼리의 Query API Key
+   - `REDASH_DETAIL_QUERY_ID`: `7983`
+   - `REDASH_DETAIL_API_KEY`: 7983 쿼리의 Query API Key
+4. Vercel에 재배포하면 화면에서 트랙 목록을 자동으로 불러옵니다.
+
+사용자는 화면에서 트랙과 기수만 선택하며, API 키와 쿼리 ID는 노출되지 않습니다.
