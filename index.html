@@ -107,10 +107,27 @@ body {
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 .text-input:focus, .select-input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px rgba(94,206,206,0.15); background: #fff; }
-.select-input:disabled { color: #b8b4c0; cursor: not-allowed; }
+.select-input:disabled, .text-input:disabled { color: #b8b4c0; cursor: not-allowed; opacity: 0.7; }
+.search-input { padding: 10px 12px; border: 1.5px solid rgba(196,181,244,0.35); border-radius: 11px; font-size: 0.8rem; font-family: inherit; background: #fff; color: var(--text); }
+.search-input:focus { outline: none; border-color: var(--lavender); box-shadow: 0 0 0 3px rgba(196,181,244,0.15); }
+.search-input:disabled { background: #f5f2f4; color: #b8b4c0; cursor: not-allowed; }
+.selection-stack { display: flex; flex-direction: column; gap: 8px; }
+.step-state { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: 0.7rem; font-weight: 700; color: var(--sub); letter-spacing: 0; text-transform: none; }
+.step-state.done { color: #2fa876; }
+.step-state.loading { color: #4aacac; }
+.step-state.error { color: #e03030; }
+.form-group.is-locked { opacity: 0.58; }
+.loading-indicator { display: none; align-items: center; gap: 8px; color: var(--teal-d); font-size: 0.78rem; font-weight: 700; }
+.loading-indicator.active { display: inline-flex; }
+.loading-spinner { width: 14px; height: 14px; border: 2px solid rgba(94,206,206,0.25); border-top-color: var(--teal-d); border-radius: 50%; animation: spin 0.75s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .selection-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 24px; }
 .threshold-inline { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 12px; align-items: center; }
 .threshold-title { color: var(--sub); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
+.confirm-row { display: flex; align-items: center; gap: 14px; margin-top: 22px; }
+.btn-confirm { width: auto; padding: 14px 32px; }
+.btn-confirm:disabled { cursor: not-allowed; opacity: 0.45; transform: none; box-shadow: none; }
+.confirm-hint { color: var(--sub); font-size: 0.78rem; }
 
 label {
   font-size: 0.75rem; font-weight: 700; color: var(--sub);
@@ -467,18 +484,18 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
       <div class="guide-steps">
         <div class="guide-step">
           <div class="guide-step-num">Step 1</div>
-          <div class="guide-step-title">Redash 연결</div>
-          <div class="guide-step-desc">Redash에서 현재 운영 중인 트랙과 기수 목록을 자동으로 불러옵니다. 사용자는 별도 설정 없이 드롭다운에서 선택합니다.</div>
+          <div class="guide-step-title">트랙·기수 선택</div>
+          <div class="guide-step-desc">트랙을 검색해 선택하면 해당 트랙의 기수만 표시됩니다. 기수를 선택하면 출결 데이터를 불러온 뒤 다음 단계가 열립니다.</div>
         </div>
         <div class="guide-step">
           <div class="guide-step-num">Step 2</div>
-          <div class="guide-step-title">HRD 출석부 업로드</div>
-          <div class="guide-step-desc">HRD-Net에서 내보낸 출석부 엑셀(.xlsx / .xls)을 업로드합니다. 첫 번째 시트의 데이터를 자동으로 읽고, Redash 조회 결과와 자동 비교합니다.</div>
+          <div class="guide-step-title">출석부·기준 설정</div>
+          <div class="guide-step-desc">출결 데이터가 불러와지면 HRD-Net 출석부를 업로드하고 허용 가능한 차이를 입력합니다. 모든 단계가 끝나면 비교 확인을 누릅니다.</div>
         </div>
         <div class="guide-step">
           <div class="guide-step-num">Step 3</div>
-          <div class="guide-step-title">트랙·기수 선택</div>
-          <div class="guide-step-desc">트랙을 먼저 선택하면 해당 트랙의 과거 및 현재 기수만 표시됩니다. 기수를 선택하면 Redash 출결 데이터가 자동으로 조회됩니다. HRD 엑셀을 올리면 비교 결과가 자동으로 표시됩니다.</div>
+          <div class="guide-step-title">비교 확인</div>
+          <div class="guide-step-desc">마지막으로 비교 확인을 누르면 HRD와 출결 데이터의 차이를 계산하고 결과표를 표시합니다.</div>
         </div>
       </div>
       <div class="guide-badges-title">판정 기준</div>
@@ -502,34 +519,39 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
     </div>
 
     <div class="form-row">
-      <div class="form-group">
-        <label><span class="label-dot" style="background:var(--lavender)"></span>트랙 및 기수 선택</label>
-        <select class="select-input" id="trackSelect" disabled>
-          <option value="">트랙 목록을 불러오는 중입니다</option>
-        </select>
-        <select class="select-input" id="cohortSelect" disabled>
-          <option value="">트랙을 먼저 선택해 주세요</option>
-        </select>
+      <div class="form-group" id="selectionGroup">
+        <label><span class="label-dot" style="background:var(--lavender)"></span>1단계 · 트랙 및 기수 선택 <span class="step-state" id="selectionState">진행 전</span></label>
+        <div class="selection-stack">
+          <input class="search-input" id="trackSearch" type="search" placeholder="트랙 검색" disabled>
+          <select class="select-input" id="trackSelect" disabled>
+            <option value="">트랙 목록을 불러오는 중입니다</option>
+          </select>
+          <input class="search-input" id="cohortSearch" type="search" placeholder="기수 검색" disabled>
+          <select class="select-input" id="cohortSelect" disabled>
+            <option value="">트랙을 먼저 선택해 주세요</option>
+          </select>
+          <span class="loading-indicator" id="attendanceLoading"><span class="loading-spinner"></span>출결 데이터를 불러오는 중입니다</span>
+        </div>
       </div>
-      <div class="form-group">
-        <label><span class="label-dot" style="background:var(--coral)"></span>HRD 출석부 엑셀</label>
-        <div class="file-drop-zone" id="dropZone" onclick="document.getElementById('hrdFile').click()">
-          <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)">
+      <div class="form-group is-locked" id="hrdGroup">
+        <label><span class="label-dot" style="background:var(--coral)"></span>2단계 · HRD 출석부 업로드 <span class="step-state" id="hrdState">대기 중</span></label>
+        <div class="file-drop-zone" id="dropZone" onclick="openHrdPicker()">
+          <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)" disabled>
           <div class="drop-icon">↑</div>
-          <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">클릭하거나 파일을 드래그</div>
+          <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">기수를 먼저 선택해 주세요</div>
           <div style="font-size:0.73rem;color:#b0b0c0">xlsx / xls</div>
         </div>
       </div>
-      <div class="form-group threshold-group">
-        <label><span class="label-dot" style="background:var(--yellow)"></span>허용 가능한 차이 설정</label>
+      <div class="form-group is-locked" id="thresholdGroup">
+        <label><span class="label-dot" style="background:var(--yellow)"></span>3단계 · 허용 가능한 차이 설정 <span class="step-state" id="thresholdState">대기 중</span></label>
         <div class="threshold-item high">
           <span class="th-label">HRD가 높을 때</span>
-          <input type="number" id="thresholdHigh" value="5" min="0" max="100" step="0.5" class="th-input">
+          <input type="number" id="thresholdHigh" value="5" min="0" max="100" step="0.5" class="th-input" disabled>
           <span class="th-unit">%p 이내 OK</span>
         </div>
         <div class="threshold-item low">
           <span class="th-label">HRD가 낮을 때</span>
-          <input type="number" id="thresholdLow" value="5" min="0" max="100" step="0.5" class="th-input">
+          <input type="number" id="thresholdLow" value="5" min="0" max="100" step="0.5" class="th-input" disabled>
           <span class="th-unit">%p 이내 OK</span>
         </div>
         <div class="threshold-hint">
@@ -537,6 +559,10 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
           <strong>빨간색</strong>: HRD가 Redash 출석률보다 낮음
         </div>
       </div>
+    </div>
+    <div class="confirm-row">
+      <button class="btn-run btn-confirm" id="confirmBtn" onclick="confirmComparison()" disabled>4단계 · 비교 확인</button>
+      <span class="confirm-hint" id="confirmHint">기수, HRD 출석부, 허용 차이를 모두 설정해 주세요.</span>
     </div>
   </div>
 
@@ -608,10 +634,19 @@ function toggleGuide() {
   card.querySelector('.guide-toggle-sub').textContent = isOpen ? '클릭해서 펼치기' : '클릭해서 접기';
 }
 
+function openHrdPicker() {
+  if (document.getElementById('hrdFile').disabled) {
+    setRedashStatus('먼저 트랙과 기수를 선택해 주세요.', true);
+    return;
+  }
+  document.getElementById('hrdFile').click();
+}
+
 function handleFileSelect(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
+  setStepState('hrdState', '파일을 읽는 중', 'loading');
   reader.onload = (e) => {
     try {
       hrdWorkbook = XLSX.read(e.target.result, { type: 'binary' });
@@ -622,9 +657,17 @@ function handleFileSelect(input) {
         <div class="drop-icon" style="background:rgba(168,230,208,0.3)">✓</div>
         <div class="file-name">${escH(file.name)}</div>
         <div style="font-size:0.75rem;color:#3aacac;font-weight:500">로드 완료 · 다시 선택하려면 클릭</div>`;
-      dz.onclick = () => dz.querySelector('input').click();
-      runComparison();
-    } catch(e) { alert('엑셀 파일 읽기 오류: ' + e.message); }
+      dz.onclick = openHrdPicker;
+      document.getElementById('hrdState').textContent = '완료';
+      document.getElementById('hrdState').className = 'step-state done';
+      setThresholdEnabled(true);
+      updateConfirmState();
+      setRedashStatus('출석부를 불러왔습니다. 허용 가능한 차이를 설정해 주세요.');
+      document.getElementById('thresholdGroup').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch(e) {
+      setStepState('hrdState', '오류', 'error');
+      alert('엑셀 파일 읽기 오류: ' + e.message);
+    }
   };
   reader.readAsBinaryString(file);
 }
@@ -640,6 +683,10 @@ dz.addEventListener('drop', e => {
 
 document.getElementById('trackSelect').addEventListener('change', handleTrackChange);
 document.getElementById('cohortSelect').addEventListener('change', loadCohortDetails);
+document.getElementById('trackSearch').addEventListener('input', renderTrackOptions);
+document.getElementById('cohortSearch').addEventListener('input', renderCohortOptions);
+document.getElementById('thresholdHigh').addEventListener('input', updateConfirmState);
+document.getElementById('thresholdLow').addEventListener('input', updateConfirmState);
 
 const BO_STATUS_MARKERS = ['조기수료', '중도하차', '중도탈락'];
 const HEADER_COUNT = 14;
@@ -812,7 +859,94 @@ function formatDate(value) {
   return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
+function setStepState(id, text, state = '') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = `step-state${state ? ` ${state}` : ''}`;
+}
+
+function resetHrdUpload() {
+  hrdWorkbook = null;
+  const dz = document.getElementById('dropZone');
+  dz.classList.remove('has-file');
+  dz.onclick = openHrdPicker;
+  dz.innerHTML = `
+    <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)" disabled>
+    <div class="drop-icon">↑</div>
+    <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">기수를 먼저 선택해 주세요</div>
+    <div style="font-size:0.73rem;color:#b0b0c0">xlsx / xls</div>`;
+}
+
+function setHrdEnabled(enabled) {
+  const group = document.getElementById('hrdGroup');
+  const input = document.getElementById('hrdFile');
+  input.disabled = !enabled;
+  group.classList.toggle('is-locked', !enabled);
+  if (!enabled) setStepState('hrdState', '대기 중');
+  else if (!hrdWorkbook) {
+    setStepState('hrdState', '입력 필요');
+    const hint = group.querySelector('.file-drop-zone div:nth-of-type(2)');
+    if (hint) hint.textContent = '클릭하거나 파일을 드래그';
+  }
+}
+
+function setThresholdEnabled(enabled) {
+  const group = document.getElementById('thresholdGroup');
+  document.getElementById('thresholdHigh').disabled = !enabled;
+  document.getElementById('thresholdLow').disabled = !enabled;
+  group.classList.toggle('is-locked', !enabled);
+  if (!enabled) setStepState('thresholdState', '대기 중');
+  else setStepState('thresholdState', '입력 필요');
+}
+
+function updateConfirmState() {
+  const ready = Boolean(selectedCohortId && redashStudents.length && hrdWorkbook &&
+    !document.getElementById('thresholdHigh').disabled &&
+    !document.getElementById('thresholdLow').disabled);
+  const button = document.getElementById('confirmBtn');
+  button.disabled = !ready;
+  if (ready) setStepState('thresholdState', '설정 완료', 'done');
+  document.getElementById('confirmHint').textContent = ready
+    ? '모든 단계가 완료되었습니다. 비교 확인을 눌러 결과를 확인하세요.'
+    : '기수, HRD 출석부, 허용 차이를 모두 설정해 주세요.';
+}
+
+function renderTrackOptions() {
+  const search = document.getElementById('trackSearch').value.trim().toLowerCase();
+  const tracks = [...new Map(redashCatalog.map(row => [row.trackId, row])).values()]
+    .filter(row => !search || row.trackName.toLowerCase().includes(search))
+    .sort((a, b) => a.trackName.localeCompare(b.trackName, 'ko'));
+  const select = document.getElementById('trackSelect');
+  const selected = select.value;
+  select.innerHTML = '<option value="">트랙을 선택해 주세요</option>' + tracks
+    .map(track => `<option value="${escH(track.trackId)}">${escH(track.trackName)}</option>`).join('');
+  if (tracks.some(track => track.trackId === selected)) select.value = selected;
+  else if (selected) {
+    select.value = '';
+    handleTrackChange();
+  }
+}
+
+function renderCohortOptions() {
+  const trackId = document.getElementById('trackSelect').value;
+  const search = document.getElementById('cohortSearch').value.trim().toLowerCase();
+  const cohorts = redashCatalog.filter(row => row.trackId === trackId)
+    .filter(row => !search || `${row.cohortnum}회차 ${row.title}`.toLowerCase().includes(search))
+    .sort((a, b) => Number(a.cohortnum) - Number(b.cohortnum));
+  const select = document.getElementById('cohortSelect');
+  const selected = select.value;
+  select.innerHTML = '<option value="">기수를 선택해 주세요</option>' + cohorts
+    .map(row => `<option value="${escH(row.cohortId)}">${escH(row.cohortnum)}회차 | ${escH(formatDate(row.startDate))} ~ ${escH(formatDate(row.endDate))}</option>`).join('');
+  if (cohorts.some(row => row.cohortId === selected)) select.value = selected;
+  else if (selected) {
+    select.value = '';
+    loadCohortDetails();
+  }
+}
+
 async function loadRedashCatalog() {
+  setStepState('selectionState', '불러오는 중', 'loading');
   setRedashStatus('트랙 목록을 불러오는 중입니다.');
   try {
     const rows = await fetchApiRows('/api/cohorts');
@@ -822,18 +956,15 @@ async function loadRedashCatalog() {
       const start = new Date(row.startDate).getTime();
       return Number.isNaN(start) || start <= now;
     });
-    const tracks = [...new Map(redashCatalog.map(row => [row.trackId, row])).values()]
-      .sort((a, b) => a.trackName.localeCompare(b.trackName, 'ko'));
-    const trackSelect = document.getElementById('trackSelect');
-    const cohortSelect = document.getElementById('cohortSelect');
-    trackSelect.innerHTML = '<option value="">트랙을 선택해 주세요</option>' + tracks
-      .map(track => `<option value="${escH(track.trackId)}">${escH(track.trackName)}</option>`).join('');
-    trackSelect.disabled = tracks.length === 0;
-    cohortSelect.innerHTML = '<option value="">트랙을 먼저 선택해 주세요</option>';
-    cohortSelect.disabled = true;
+    const tracks = [...new Map(redashCatalog.map(row => [row.trackId, row])).values()];
+    document.getElementById('trackSearch').disabled = tracks.length === 0;
+    document.getElementById('trackSelect').disabled = tracks.length === 0;
+    renderTrackOptions();
+    setStepState('selectionState', '선택 필요');
     setRedashStatus(`${tracks.length}개 트랙, ${redashCatalog.length}개 기수를 불러왔습니다.`);
   } catch (error) {
     redashCatalog = [];
+    setStepState('selectionState', '오류', 'error');
     setRedashStatus(error.message, true);
   }
 }
@@ -841,15 +972,25 @@ async function loadRedashCatalog() {
 function handleTrackChange() {
   const trackId = document.getElementById('trackSelect').value;
   const cohortSelect = document.getElementById('cohortSelect');
-  const cohorts = redashCatalog.filter(row => row.trackId === trackId)
-    .sort((a, b) => Number(a.cohortnum) - Number(b.cohortnum));
-  cohortSelect.innerHTML = '<option value="">기수를 선택해 주세요</option>' + cohorts
-    .map(row => `<option value="${escH(row.cohortId)}">${escH(row.cohortnum)}회차 | ${escH(formatDate(row.startDate))} ~ ${escH(formatDate(row.endDate))}</option>`).join('');
+  const cohortSearch = document.getElementById('cohortSearch');
+  renderCohortOptions();
+  const cohorts = redashCatalog.filter(row => row.trackId === trackId);
   cohortSelect.disabled = !trackId || cohorts.length === 0;
+  cohortSearch.disabled = !trackId || cohorts.length === 0;
   selectedCohortId = '';
   redashStudents = [];
+  resetHrdUpload();
+  setHrdEnabled(false);
+  setThresholdEnabled(false);
   document.getElementById('resultSection').style.display = 'none';
-  setRedashStatus(trackId ? `${cohorts.length}개 기수를 선택할 수 있습니다.` : '트랙을 선택해 주세요.');
+  if (trackId) {
+    setStepState('selectionState', '기수 선택 필요');
+    setRedashStatus(`${cohorts.length}개 기수를 선택할 수 있습니다.`);
+  } else {
+    setStepState('selectionState', '선택 필요');
+    setRedashStatus('트랙을 선택해 주세요.');
+  }
+  updateConfirmState();
 }
 
 function normalizeDetailRow(row) {
@@ -876,18 +1017,48 @@ function normalizeDetailRow(row) {
 
 async function loadCohortDetails() {
   const cohortId = document.getElementById('cohortSelect').value;
-  if (!cohortId) return;
+  if (!cohortId) {
+    selectedCohortId = '';
+    redashStudents = [];
+    resetHrdUpload();
+    setStepState('selectionState', '기수 선택 필요');
+    setHrdEnabled(false);
+    setThresholdEnabled(false);
+    updateConfirmState();
+    return;
+  }
   selectedCohortId = cohortId;
-  setRedashStatus('선택한 기수의 수강생 출결을 불러오는 중입니다.');
+  const loading = document.getElementById('attendanceLoading');
+  loading.classList.add('active');
+  setStepState('selectionState', '출결 조회 중', 'loading');
+  setRedashStatus('선택한 기수의 출결 데이터를 불러오는 중입니다.');
   try {
     const rows = await fetchApiRows(`/api/attendance?cohort_id=${encodeURIComponent(cohortId)}`);
     redashStudents = rows.map(normalizeDetailRow).filter(row => row.name && row.resNo.length >= 6);
-    setRedashStatus(`${redashStudents.length}명의 출결 데이터를 불러왔습니다.`);
-    runComparison();
+    setStepState('selectionState', '완료', 'done');
+    setHrdEnabled(true);
+    setRedashStatus(`${redashStudents.length}명의 출결 데이터를 불러왔습니다. HRD 출석부를 업로드해 주세요.`);
+    updateConfirmState();
+    document.getElementById('hrdGroup').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (error) {
     redashStudents = [];
+    setStepState('selectionState', '오류', 'error');
     setRedashStatus(error.message, true);
+    setHrdEnabled(false);
+    updateConfirmState();
+  } finally {
+    loading.classList.remove('active');
   }
+}
+
+function confirmComparison() {
+  if (!redashStudents.length || !hrdWorkbook) {
+    setRedashStatus('모든 단계를 먼저 완료해 주세요.', true);
+    return;
+  }
+  setStepState('thresholdState', '완료', 'done');
+  document.getElementById('confirmHint').textContent = '비교를 완료했습니다.';
+  runComparison();
 }
 
 function runComparison() {
