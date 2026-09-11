@@ -122,6 +122,7 @@ body {
 .loading-spinner { width: 14px; height: 14px; border: 2px solid rgba(94,206,206,0.25); border-top-color: var(--teal-d); border-radius: 50%; animation: spin 0.75s linear infinite; }
 .loading-panel { min-height: 230px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--teal-d); font-size: 0.9rem; font-weight: 700; background: rgba(94,206,206,0.04); border-radius: 18px; margin-bottom: 20px; }
 .loading-panel.error { color: #e03030; background: rgba(255,140,140,0.06); }
+.loading-panel[hidden] { display: none !important; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .selection-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 24px; }
 .threshold-inline { display: grid; grid-template-columns: 1fr 1fr 1.6fr; gap: 12px; align-items: center; }
@@ -487,7 +488,7 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
         <div class="guide-step">
           <div class="guide-step-num">Step 1</div>
           <div class="guide-step-title">트랙·기수 선택</div>
-          <div class="guide-step-desc">트랙을 검색해 선택하면 해당 트랙의 기수만 표시됩니다. 기수와 HRD 출석부, 차이 설정을 준비한 뒤 마지막에 비교 확인을 누릅니다.</div>
+          <div class="guide-step-desc">드롭다운을 열어 트랙을 선택합니다. 목록이 열린 상태에서 글자를 입력하면 원하는 트랙을 빠르게 찾을 수 있습니다. 이후 기수를 선택합니다.</div>
         </div>
         <div class="guide-step">
           <div class="guide-step-num">Step 2</div>
@@ -524,10 +525,12 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
       <div class="form-group" id="selectionGroup">
         <label><span class="label-dot" style="background:var(--lavender)"></span>1단계 · 트랙 및 기수 선택</label>
         <div class="selection-stack">
-          <input class="select-input" id="trackSelect" list="trackOptions" placeholder="트랙을 검색하거나 선택해 주세요" disabled>
-          <datalist id="trackOptions"></datalist>
-          <input class="select-input" id="cohortSelect" list="cohortOptions" placeholder="트랙을 먼저 선택해 주세요" disabled>
-          <datalist id="cohortOptions"></datalist>
+          <select class="select-input" id="trackSelect" disabled>
+            <option value="">트랙을 선택해 주세요</option>
+          </select>
+          <select class="select-input" id="cohortSelect" disabled>
+            <option value="">트랙을 먼저 선택해 주세요</option>
+          </select>
         </div>
       </div>
       <div class="form-group" id="hrdGroup">
@@ -904,8 +907,8 @@ function trackRows() {
 }
 
 function selectedTrackRow() {
-  const value = document.getElementById('trackSelect').value.trim();
-  return trackRows().find(row => row.trackName === value) || null;
+  const trackId = document.getElementById('trackSelect').value;
+  return trackRows().find(row => row.trackId === trackId) || null;
 }
 
 function cohortLabel(row) {
@@ -914,23 +917,23 @@ function cohortLabel(row) {
 
 function selectedCohortRow() {
   const track = selectedTrackRow();
-  const value = document.getElementById('cohortSelect').value.trim();
-  return redashCatalog.find(row => row.trackId === track?.trackId && cohortLabel(row) === value) || null;
+  const cohortId = document.getElementById('cohortSelect').value;
+  return redashCatalog.find(row => row.trackId === track?.trackId && row.cohortId === cohortId) || null;
 }
 
 function renderTrackOptions() {
-  const datalist = document.getElementById('trackOptions');
-  datalist.innerHTML = trackRows()
-    .map(track => `<option value="${escH(track.trackName)}"></option>`).join('');
+  const select = document.getElementById('trackSelect');
+  select.innerHTML = '<option value="">트랙을 선택해 주세요</option>' + trackRows()
+    .map(track => `<option value="${escH(track.trackId)}">${escH(track.trackName)}</option>`).join('');
 }
 
 function renderCohortOptions() {
   const track = selectedTrackRow();
-  const datalist = document.getElementById('cohortOptions');
+  const select = document.getElementById('cohortSelect');
   const cohorts = redashCatalog.filter(row => row.trackId === track?.trackId)
     .sort((a, b) => Number(a.cohortnum) - Number(b.cohortnum));
-  datalist.innerHTML = cohorts
-    .map(row => `<option value="${escH(cohortLabel(row))}"></option>`).join('');
+  select.innerHTML = '<option value="">기수를 선택해 주세요</option>' + cohorts
+    .map(row => `<option value="${escH(row.cohortId)}">${escH(cohortLabel(row))}</option>`).join('');
 }
 
 async function loadRedashCatalog() {
