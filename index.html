@@ -108,6 +108,18 @@ body {
 }
 .text-input:focus, .select-input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px rgba(94,206,206,0.15); background: #fff; }
 .select-input:disabled, .text-input:disabled { color: #b8b4c0; cursor: not-allowed; opacity: 0.7; }
+.combo-select { position: relative; width: 100%; }
+.combo-input { width: 100%; padding: 13px 42px 13px 14px; border: 2px solid transparent; border-radius: 12px; font-size: 0.84rem; font-family: inherit; background: #faf5f3; color: var(--text); transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; }
+.combo-input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 4px rgba(94,206,206,0.15); background: #fff; }
+.combo-input:disabled { color: #b8b4c0; cursor: not-allowed; opacity: 0.7; }
+.combo-toggle { position: absolute; top: 1px; right: 1px; width: 40px; height: calc(100% - 2px); border: 0; border-radius: 0 11px 11px 0; background: transparent; color: var(--sub); cursor: pointer; font-size: 1rem; }
+.combo-toggle:hover:not(:disabled) { background: rgba(94,206,206,0.08); color: var(--teal-d); }
+.combo-toggle:disabled { cursor: not-allowed; opacity: 0.5; }
+.combo-menu { position: absolute; z-index: 20; top: calc(100% + 5px); left: 0; right: 0; max-height: 240px; overflow-y: auto; padding: 6px; background: #fff; border: 1px solid rgba(94,206,206,0.2); border-radius: 12px; box-shadow: 0 10px 28px rgba(80,60,80,0.14); }
+.combo-menu[hidden] { display: none !important; }
+.combo-option { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 0.8rem; text-align: left; cursor: pointer; }
+.combo-option:hover, .combo-option:focus { outline: none; background: rgba(94,206,206,0.1); color: var(--teal-d); }
+.combo-empty { padding: 10px 12px; color: var(--sub); font-size: 0.78rem; }
 .search-input { padding: 10px 12px; border: 1.5px solid rgba(196,181,244,0.35); border-radius: 11px; font-size: 0.8rem; font-family: inherit; background: #fff; color: var(--text); }
 .search-input:focus { outline: none; border-color: var(--lavender); box-shadow: 0 0 0 3px rgba(196,181,244,0.15); }
 .search-input:disabled { background: #f5f2f4; color: #b8b4c0; cursor: not-allowed; }
@@ -525,12 +537,16 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
       <div class="form-group" id="selectionGroup">
         <label><span class="label-dot" style="background:var(--lavender)"></span>1단계 · 트랙 및 기수 선택</label>
         <div class="selection-stack">
-          <select class="select-input" id="trackSelect" disabled>
-            <option value="">트랙을 선택해 주세요</option>
-          </select>
-          <select class="select-input" id="cohortSelect" disabled>
-            <option value="">트랙을 먼저 선택해 주세요</option>
-          </select>
+          <div class="combo-select" id="trackCombo">
+            <input class="combo-input" id="trackSelect" type="text" autocomplete="off" placeholder="트랙을 검색하거나 선택해 주세요" disabled>
+            <button class="combo-toggle" id="trackToggle" type="button" aria-label="트랙 목록 열기" disabled>▾</button>
+            <div class="combo-menu" id="trackOptions" hidden></div>
+          </div>
+          <div class="combo-select" id="cohortCombo">
+            <input class="combo-input" id="cohortSelect" type="text" autocomplete="off" placeholder="트랙을 먼저 선택해 주세요" disabled>
+            <button class="combo-toggle" id="cohortToggle" type="button" aria-label="기수 목록 열기" disabled>▾</button>
+            <div class="combo-menu" id="cohortOptions" hidden></div>
+          </div>
         </div>
       </div>
       <div class="form-group" id="hrdGroup">
@@ -683,8 +699,23 @@ dz.addEventListener('drop', e => {
   if (f) { const dt = new DataTransfer(); dt.items.add(f); document.getElementById('hrdFile').files = dt.files; handleFileSelect(document.getElementById('hrdFile')); }
 });
 
-document.getElementById('trackSelect').addEventListener('change', handleTrackChange);
-document.getElementById('cohortSelect').addEventListener('change', handleCohortChange);
+document.getElementById('trackSelect').addEventListener('input', event => renderTrackOptions(event.target.value));
+document.getElementById('cohortSelect').addEventListener('input', event => renderCohortOptions(event.target.value));
+document.getElementById('trackToggle').addEventListener('click', () => openCombo('trackCombo'));
+document.getElementById('cohortToggle').addEventListener('click', () => openCombo('cohortCombo'));
+document.getElementById('trackSelect').addEventListener('focus', () => openCombo('trackCombo'));
+document.getElementById('cohortSelect').addEventListener('focus', () => openCombo('cohortCombo'));
+document.getElementById('trackOptions').addEventListener('mousedown', event => {
+  const option = event.target.closest('.combo-option');
+  if (option) { event.preventDefault(); chooseComboValue('trackCombo', option.dataset.value); }
+});
+document.getElementById('cohortOptions').addEventListener('mousedown', event => {
+  const option = event.target.closest('.combo-option');
+  if (option) { event.preventDefault(); chooseComboValue('cohortCombo', option.dataset.value); }
+});
+document.addEventListener('click', event => {
+  if (!event.target.closest('.combo-select')) closeComboMenus();
+});
 document.getElementById('thresholdHigh').addEventListener('input', updateConfirmState);
 document.getElementById('thresholdLow').addEventListener('input', updateConfirmState);
 
@@ -907,8 +938,8 @@ function trackRows() {
 }
 
 function selectedTrackRow() {
-  const trackId = document.getElementById('trackSelect').value;
-  return trackRows().find(row => row.trackId === trackId) || null;
+  const value = document.getElementById('trackSelect').value.trim();
+  return trackRows().find(row => row.trackName === value) || null;
 }
 
 function cohortLabel(row) {
@@ -917,23 +948,59 @@ function cohortLabel(row) {
 
 function selectedCohortRow() {
   const track = selectedTrackRow();
-  const cohortId = document.getElementById('cohortSelect').value;
-  return redashCatalog.find(row => row.trackId === track?.trackId && row.cohortId === cohortId) || null;
+  const value = document.getElementById('cohortSelect').value.trim();
+  return redashCatalog.find(row => row.trackId === track?.trackId && cohortLabel(row) === value) || null;
 }
 
-function renderTrackOptions() {
-  const select = document.getElementById('trackSelect');
-  select.innerHTML = '<option value="">트랙을 선택해 주세요</option>' + trackRows()
-    .map(track => `<option value="${escH(track.trackId)}">${escH(track.trackName)}</option>`).join('');
+function closeComboMenus() {
+  document.querySelectorAll('.combo-menu').forEach(menu => { menu.hidden = true; });
 }
 
-function renderCohortOptions() {
+function setComboEnabled(comboId, enabled) {
+  const combo = document.getElementById(comboId);
+  combo.querySelector('.combo-input').disabled = !enabled;
+  combo.querySelector('.combo-toggle').disabled = !enabled;
+}
+
+function renderTrackOptions(query = '') {
+  const menu = document.getElementById('trackOptions');
+  const normalized = query.trim().toLocaleLowerCase();
+  const tracks = trackRows().filter(track => !normalized || track.trackName.toLocaleLowerCase().includes(normalized));
+  menu.innerHTML = tracks.length
+    ? tracks.map(track => `<button type="button" class="combo-option" data-value="${escH(track.trackName)}">${escH(track.trackName)}</button>`).join('')
+    : '<div class="combo-empty">검색 결과가 없습니다.</div>';
+}
+
+function renderCohortOptions(query = '') {
   const track = selectedTrackRow();
-  const select = document.getElementById('cohortSelect');
+  const menu = document.getElementById('cohortOptions');
+  const normalized = query.trim().toLocaleLowerCase();
   const cohorts = redashCatalog.filter(row => row.trackId === track?.trackId)
+    .filter(row => !normalized || cohortLabel(row).toLocaleLowerCase().includes(normalized))
     .sort((a, b) => Number(a.cohortnum) - Number(b.cohortnum));
-  select.innerHTML = '<option value="">기수를 선택해 주세요</option>' + cohorts
-    .map(row => `<option value="${escH(row.cohortId)}">${escH(cohortLabel(row))}</option>`).join('');
+  menu.innerHTML = cohorts.length
+    ? cohorts.map(row => `<button type="button" class="combo-option" data-value="${escH(cohortLabel(row))}">${escH(cohortLabel(row))}</button>`).join('')
+    : '<div class="combo-empty">검색 결과가 없습니다.</div>';
+}
+
+function openCombo(comboId) {
+  const combo = document.getElementById(comboId);
+  const input = combo.querySelector('.combo-input');
+  if (input.disabled) return;
+  closeComboMenus();
+  const menu = combo.querySelector('.combo-menu');
+  menu.hidden = false;
+  if (comboId === 'trackCombo') renderTrackOptions();
+  else renderCohortOptions();
+  input.focus();
+}
+
+function chooseComboValue(comboId, value) {
+  const combo = document.getElementById(comboId);
+  combo.querySelector('.combo-input').value = value;
+  combo.querySelector('.combo-menu').hidden = true;
+  if (comboId === 'trackCombo') handleTrackChange();
+  else handleCohortChange();
 }
 
 async function loadRedashCatalog() {
@@ -948,8 +1015,8 @@ async function loadRedashCatalog() {
       return Number.isNaN(start) || start <= now;
     });
     const tracks = trackRows();
-    document.getElementById('trackSelect').disabled = tracks.length === 0;
-    document.getElementById('cohortSelect').disabled = true;
+    setComboEnabled('trackCombo', tracks.length > 0);
+    setComboEnabled('cohortCombo', false);
     renderTrackOptions();
     setRedashStatus(`${tracks.length}개 트랙, ${redashCatalog.length}개 기수를 불러왔습니다.`);
   } catch (error) {
@@ -964,7 +1031,7 @@ function handleTrackChange() {
   const cohortSelect = document.getElementById('cohortSelect');
   renderCohortOptions();
   const cohorts = redashCatalog.filter(row => row.trackId === track?.trackId);
-  cohortSelect.disabled = !track || cohorts.length === 0;
+  setComboEnabled('cohortCombo', Boolean(track && cohorts.length));
   cohortSelect.value = '';
   selectedCohortId = '';
   redashStudents = [];
