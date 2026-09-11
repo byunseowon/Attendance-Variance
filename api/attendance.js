@@ -22,9 +22,41 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function keySource() {
+  if (process.env.REDASH_DETAIL_USER_API_KEY) return 'REDASH_DETAIL_USER_API_KEY';
+  if (process.env.REDASH_API_KEY) return 'REDASH_API_KEY';
+  if (process.env.REDASH_DETAIL_API_KEY) return 'REDASH_DETAIL_API_KEY';
+  return 'none';
+}
+
+function redashHost(baseUrl) {
+  try {
+    return new URL(baseUrl).host;
+  } catch (_) {
+    return 'invalid-url';
+  }
+}
+
+async function responsePreview(response, params = {}) {
+  const text = await response.text();
+  let preview = text.slice(0, 800);
+  Object.values(params).forEach(value => {
+    if (value) preview = preview.split(String(value)).join('[redacted]');
+  });
+  return preview;
+}
+
 async function runRedashQuery(queryId, params) {
   const baseUrl = String(process.env.REDASH_URL || '').replace(/\/$/, '');
   const apiKey = process.env.REDASH_DETAIL_USER_API_KEY || process.env.REDASH_API_KEY || process.env.REDASH_DETAIL_API_KEY || '';
+  console.log('[attendance] Redash config', {
+    queryId: String(queryId),
+    redashHost: redashHost(baseUrl),
+    keySource: keySource(),
+    hasApiKey: Boolean(apiKey),
+    parameterNames: Object.keys(params || {}),
+    cohortIdLength: String(params?.cohort_id || '').length
+  });
   if (!baseUrl || !apiKey || !queryId) throw new Error('Redash 환경변수가 설정되지 않았습니다.');
 
   // 파라미터 쿼리는 latest results.json GET으로 조회할 수 없습니다.
@@ -36,11 +68,17 @@ async function runRedashQuery(queryId, params) {
     body: JSON.stringify({ max_age: 0, parameters: params })
   });
   if (!executeResponse.ok) {
+    console.error('[attendance] Redash execute failed', {
+      status: executeResponse.status,
+      contentType: executeResponse.headers.get('content-type'),
+      body: await responsePreview(executeResponse, params)
+    });
     throw new Error(`Redash 파라미터 쿼리 실행 실패 (${executeResponse.status})`);
   }
 
   const executePayload = await executeResponse.json();
   const jobId = executePayload?.job?.id;
+  console.log('[attendance] Redash execute accepted', { hasJobId: Boolean(jobId) });
   if (!jobId) throw new Error('Redash 쿼리 실행 작업 ID를 받지 못했습니다.');
 
   let job;
@@ -49,12 +87,26 @@ async function runRedashQuery(queryId, params) {
     const jobResponse = await fetch(`${baseUrl}/api/jobs/${encodeURIComponent(jobId)}`, {
       headers: redashHeaders(apiKey)
     });
-    if (!jobResponse.ok) throw new Error(`Redash 작업 상태 조회 실패 (${jobResponse.status})`);
+    if (!jobResponse.ok) {
+      console.error('[attendance] Redash job status failed', {
+        status: jobResponse.status,
+        contentType: jobResponse.headers.get('content-type'),
+        body: await responsePreview(jobResponse)
+      });
+      throw new Error(`Redash 작업 상태 조회 실패 (${jobResponse.status})`);
+    }
     job = (await jobResponse.json()).job;
     if (job?.status === 3) break;
-    if ([4, 5].includes(job?.status)) throw new Error('Redash 출결 쿼리 실행에 실패했습니다.');
+    if ([4, 5].includes(job?.status)) {
+      console.error('[attendance] Redash job ended', { status: job?.status });
+      throw new Error('Redash 출결 쿼리 실행에 실패했습니다.');
+    }
   }
 
+  console.log('[attendance] Redash job complete', {
+    status: job?.status,
+    hasQueryResultId: Boolean(job?.query_result_id)
+  });
   if (job?.status !== 3 || !job?.query_result_id) {
     throw new Error('Redash 출결 쿼리 응답 시간이 초과되었습니다.');
   }
@@ -63,8 +115,17 @@ async function runRedashQuery(queryId, params) {
     `${baseUrl}/api/queries/${encodeURIComponent(queryId)}/results/${encodeURIComponent(job.query_result_id)}.json`,
     { headers: redashHeaders(apiKey) }
   );
-  if (!resultResponse.ok) throw new Error(`Redash 결과 조회 실패 (${resultResponse.status})`);
-  return extractRows(await resultResponse.json());
+  if (!resultResponse.ok) {
+    console.error('[attendance] Redash result fetch failed', {
+      status: resultResponse.status,
+      contentType: resultResponse.headers.get('content-type'),
+      body: await responsePreview(resultResponse)
+    });
+    throw new Error(`Redash 결과 조회 실패 (${resultResponse.status})`);
+  }
+  const rows = extractRows(await resultResponse.json());
+  console.log('[attendance] Redash result received', { rowCount: rows.length });
+  return rows;
 }
 
 module.exports = async function handler(req, res) {
