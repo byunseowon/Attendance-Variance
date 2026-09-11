@@ -520,38 +520,34 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
 
     <div class="form-row">
       <div class="form-group" id="selectionGroup">
-        <label><span class="label-dot" style="background:var(--lavender)"></span>1단계 · 트랙 및 기수 선택 <span class="step-state" id="selectionState">진행 전</span></label>
+        <label><span class="label-dot" style="background:var(--lavender)"></span>1단계 · 트랙 및 기수 선택</label>
         <div class="selection-stack">
-          <input class="search-input" id="trackSearch" type="search" placeholder="트랙 검색" disabled>
-          <select class="select-input" id="trackSelect" disabled>
-            <option value="">트랙 목록을 불러오는 중입니다</option>
-          </select>
-          <input class="search-input" id="cohortSearch" type="search" placeholder="기수 검색" disabled>
-          <select class="select-input" id="cohortSelect" disabled>
-            <option value="">트랙을 먼저 선택해 주세요</option>
-          </select>
+          <input class="select-input" id="trackSelect" list="trackOptions" placeholder="트랙을 검색하거나 선택해 주세요" disabled>
+          <datalist id="trackOptions"></datalist>
+          <input class="select-input" id="cohortSelect" list="cohortOptions" placeholder="트랙을 먼저 선택해 주세요" disabled>
+          <datalist id="cohortOptions"></datalist>
           <span class="loading-indicator" id="attendanceLoading"><span class="loading-spinner"></span>출결 데이터를 불러오는 중입니다</span>
         </div>
       </div>
-      <div class="form-group is-locked" id="hrdGroup">
-        <label><span class="label-dot" style="background:var(--coral)"></span>2단계 · HRD 출석부 업로드 <span class="step-state" id="hrdState">대기 중</span></label>
+      <div class="form-group" id="hrdGroup">
+        <label><span class="label-dot" style="background:var(--coral)"></span>2단계 · HRD 출석부 업로드</label>
         <div class="file-drop-zone" id="dropZone" onclick="openHrdPicker()">
-          <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)" disabled>
+          <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)">
           <div class="drop-icon">↑</div>
-          <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">기수를 먼저 선택해 주세요</div>
+          <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">클릭하거나 파일을 드래그</div>
           <div style="font-size:0.73rem;color:#b0b0c0">xlsx / xls</div>
         </div>
       </div>
-      <div class="form-group is-locked" id="thresholdGroup">
-        <label><span class="label-dot" style="background:var(--yellow)"></span>3단계 · 허용 가능한 차이 설정 <span class="step-state" id="thresholdState">대기 중</span></label>
+      <div class="form-group" id="thresholdGroup">
+        <label><span class="label-dot" style="background:var(--yellow)"></span>3단계 · 허용 가능한 차이 설정</label>
         <div class="threshold-item high">
           <span class="th-label">HRD가 높을 때</span>
-          <input type="number" id="thresholdHigh" value="5" min="0" max="100" step="0.5" class="th-input" disabled>
+          <input type="number" id="thresholdHigh" value="5" min="0" max="100" step="0.5" class="th-input">
           <span class="th-unit">%p 이내 OK</span>
         </div>
         <div class="threshold-item low">
           <span class="th-label">HRD가 낮을 때</span>
-          <input type="number" id="thresholdLow" value="5" min="0" max="100" step="0.5" class="th-input" disabled>
+          <input type="number" id="thresholdLow" value="5" min="0" max="100" step="0.5" class="th-input">
           <span class="th-unit">%p 이내 OK</span>
         </div>
         <div class="threshold-hint">
@@ -658,8 +654,6 @@ function handleFileSelect(input) {
         <div class="file-name">${escH(file.name)}</div>
         <div style="font-size:0.75rem;color:#3aacac;font-weight:500">로드 완료 · 다시 선택하려면 클릭</div>`;
       dz.onclick = openHrdPicker;
-      document.getElementById('hrdState').textContent = '완료';
-      document.getElementById('hrdState').className = 'step-state done';
       setThresholdEnabled(true);
       updateConfirmState();
       setRedashStatus('출석부를 불러왔습니다. 허용 가능한 차이를 설정해 주세요.');
@@ -683,8 +677,6 @@ dz.addEventListener('drop', e => {
 
 document.getElementById('trackSelect').addEventListener('change', handleTrackChange);
 document.getElementById('cohortSelect').addEventListener('change', loadCohortDetails);
-document.getElementById('trackSearch').addEventListener('input', renderTrackOptions);
-document.getElementById('cohortSearch').addEventListener('input', renderCohortOptions);
 document.getElementById('thresholdHigh').addEventListener('input', updateConfirmState);
 document.getElementById('thresholdLow').addEventListener('input', updateConfirmState);
 
@@ -872,32 +864,21 @@ function resetHrdUpload() {
   dz.classList.remove('has-file');
   dz.onclick = openHrdPicker;
   dz.innerHTML = `
-    <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)" disabled>
+    <input type="file" id="hrdFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)">
     <div class="drop-icon">↑</div>
-    <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">기수를 먼저 선택해 주세요</div>
+    <div style="font-size:0.85rem;color:#8a8a9a;font-weight:600">클릭하거나 파일을 드래그</div>
     <div style="font-size:0.73rem;color:#b0b0c0">xlsx / xls</div>`;
 }
 
-function setHrdEnabled(enabled) {
-  const group = document.getElementById('hrdGroup');
-  const input = document.getElementById('hrdFile');
-  input.disabled = !enabled;
-  group.classList.toggle('is-locked', !enabled);
-  if (!enabled) setStepState('hrdState', '대기 중');
-  else if (!hrdWorkbook) {
-    setStepState('hrdState', '입력 필요');
-    const hint = group.querySelector('.file-drop-zone div:nth-of-type(2)');
-    if (hint) hint.textContent = '클릭하거나 파일을 드래그';
-  }
+function setHrdEnabled() {
+  document.getElementById('hrdFile').disabled = false;
+  document.getElementById('hrdGroup').classList.remove('is-locked');
 }
 
-function setThresholdEnabled(enabled) {
-  const group = document.getElementById('thresholdGroup');
-  document.getElementById('thresholdHigh').disabled = !enabled;
-  document.getElementById('thresholdLow').disabled = !enabled;
-  group.classList.toggle('is-locked', !enabled);
-  if (!enabled) setStepState('thresholdState', '대기 중');
-  else setStepState('thresholdState', '입력 필요');
+function setThresholdEnabled() {
+  document.getElementById('thresholdHigh').disabled = false;
+  document.getElementById('thresholdLow').disabled = false;
+  document.getElementById('thresholdGroup').classList.remove('is-locked');
 }
 
 function updateConfirmState() {
@@ -912,37 +893,39 @@ function updateConfirmState() {
     : '기수, HRD 출석부, 허용 차이를 모두 설정해 주세요.';
 }
 
-function renderTrackOptions() {
-  const search = document.getElementById('trackSearch').value.trim().toLowerCase();
-  const tracks = [...new Map(redashCatalog.map(row => [row.trackId, row])).values()]
-    .filter(row => !search || row.trackName.toLowerCase().includes(search))
+function trackRows() {
+  return [...new Map(redashCatalog.map(row => [row.trackId, row])).values()]
     .sort((a, b) => a.trackName.localeCompare(b.trackName, 'ko'));
-  const select = document.getElementById('trackSelect');
-  const selected = select.value;
-  select.innerHTML = '<option value="">트랙을 선택해 주세요</option>' + tracks
-    .map(track => `<option value="${escH(track.trackId)}">${escH(track.trackName)}</option>`).join('');
-  if (tracks.some(track => track.trackId === selected)) select.value = selected;
-  else if (selected) {
-    select.value = '';
-    handleTrackChange();
-  }
+}
+
+function selectedTrackRow() {
+  const value = document.getElementById('trackSelect').value.trim();
+  return trackRows().find(row => row.trackName === value) || null;
+}
+
+function cohortLabel(row) {
+  return `${row.cohortnum}회차 | ${formatDate(row.startDate)} ~ ${formatDate(row.endDate)}`;
+}
+
+function selectedCohortRow() {
+  const track = selectedTrackRow();
+  const value = document.getElementById('cohortSelect').value.trim();
+  return redashCatalog.find(row => row.trackId === track?.trackId && cohortLabel(row) === value) || null;
+}
+
+function renderTrackOptions() {
+  const datalist = document.getElementById('trackOptions');
+  datalist.innerHTML = trackRows()
+    .map(track => `<option value="${escH(track.trackName)}"></option>`).join('');
 }
 
 function renderCohortOptions() {
-  const trackId = document.getElementById('trackSelect').value;
-  const search = document.getElementById('cohortSearch').value.trim().toLowerCase();
-  const cohorts = redashCatalog.filter(row => row.trackId === trackId)
-    .filter(row => !search || `${row.cohortnum}회차 ${row.title}`.toLowerCase().includes(search))
+  const track = selectedTrackRow();
+  const datalist = document.getElementById('cohortOptions');
+  const cohorts = redashCatalog.filter(row => row.trackId === track?.trackId)
     .sort((a, b) => Number(a.cohortnum) - Number(b.cohortnum));
-  const select = document.getElementById('cohortSelect');
-  const selected = select.value;
-  select.innerHTML = '<option value="">기수를 선택해 주세요</option>' + cohorts
-    .map(row => `<option value="${escH(row.cohortId)}">${escH(row.cohortnum)}회차 | ${escH(formatDate(row.startDate))} ~ ${escH(formatDate(row.endDate))}</option>`).join('');
-  if (cohorts.some(row => row.cohortId === selected)) select.value = selected;
-  else if (selected) {
-    select.value = '';
-    loadCohortDetails();
-  }
+  datalist.innerHTML = cohorts
+    .map(row => `<option value="${escH(cohortLabel(row))}"></option>`).join('');
 }
 
 async function loadRedashCatalog() {
@@ -956,11 +939,10 @@ async function loadRedashCatalog() {
       const start = new Date(row.startDate).getTime();
       return Number.isNaN(start) || start <= now;
     });
-    const tracks = [...new Map(redashCatalog.map(row => [row.trackId, row])).values()];
-    document.getElementById('trackSearch').disabled = tracks.length === 0;
+    const tracks = trackRows();
     document.getElementById('trackSelect').disabled = tracks.length === 0;
+    document.getElementById('cohortSelect').disabled = true;
     renderTrackOptions();
-    setStepState('selectionState', '선택 필요');
     setRedashStatus(`${tracks.length}개 트랙, ${redashCatalog.length}개 기수를 불러왔습니다.`);
   } catch (error) {
     redashCatalog = [];
@@ -970,26 +952,19 @@ async function loadRedashCatalog() {
 }
 
 function handleTrackChange() {
-  const trackId = document.getElementById('trackSelect').value;
+  const track = selectedTrackRow();
   const cohortSelect = document.getElementById('cohortSelect');
-  const cohortSearch = document.getElementById('cohortSearch');
   renderCohortOptions();
-  const cohorts = redashCatalog.filter(row => row.trackId === trackId);
-  cohortSelect.disabled = !trackId || cohorts.length === 0;
-  cohortSearch.disabled = !trackId || cohorts.length === 0;
+  const cohorts = redashCatalog.filter(row => row.trackId === track?.trackId);
+  cohortSelect.disabled = !track || cohorts.length === 0;
+  cohortSelect.value = '';
   selectedCohortId = '';
   redashStudents = [];
   resetHrdUpload();
-  setHrdEnabled(false);
-  setThresholdEnabled(false);
+  setHrdEnabled(true);
+  setThresholdEnabled(true);
   document.getElementById('resultSection').style.display = 'none';
-  if (trackId) {
-    setStepState('selectionState', '기수 선택 필요');
-    setRedashStatus(`${cohorts.length}개 기수를 선택할 수 있습니다.`);
-  } else {
-    setStepState('selectionState', '선택 필요');
-    setRedashStatus('트랙을 선택해 주세요.');
-  }
+  setRedashStatus(track ? `${cohorts.length}개 기수를 선택할 수 있습니다.` : '트랙을 선택해 주세요.');
   updateConfirmState();
 }
 
@@ -1016,35 +991,29 @@ function normalizeDetailRow(row) {
 }
 
 async function loadCohortDetails() {
-  const cohortId = document.getElementById('cohortSelect').value;
-  if (!cohortId) {
+  const cohort = selectedCohortRow();
+  if (!cohort) {
     selectedCohortId = '';
     redashStudents = [];
-    resetHrdUpload();
-    setStepState('selectionState', '기수 선택 필요');
-    setHrdEnabled(false);
-    setThresholdEnabled(false);
+    document.getElementById('resultSection').style.display = 'none';
     updateConfirmState();
     return;
   }
+  const cohortId = cohort.cohortId;
+  if (selectedCohortId && selectedCohortId !== cohortId) resetHrdUpload();
   selectedCohortId = cohortId;
   const loading = document.getElementById('attendanceLoading');
   loading.classList.add('active');
-  setStepState('selectionState', '출결 조회 중', 'loading');
   setRedashStatus('선택한 기수의 출결 데이터를 불러오는 중입니다.');
   try {
     const rows = await fetchApiRows(`/api/attendance?cohort_id=${encodeURIComponent(cohortId)}`);
     redashStudents = rows.map(normalizeDetailRow).filter(row => row.name && row.resNo.length >= 6);
-    setStepState('selectionState', '완료', 'done');
-    setHrdEnabled(true);
     setRedashStatus(`${redashStudents.length}명의 출결 데이터를 불러왔습니다. HRD 출석부를 업로드해 주세요.`);
     updateConfirmState();
     document.getElementById('hrdGroup').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (error) {
     redashStudents = [];
-    setStepState('selectionState', '오류', 'error');
     setRedashStatus(error.message, true);
-    setHrdEnabled(false);
     updateConfirmState();
   } finally {
     loading.classList.remove('active');
