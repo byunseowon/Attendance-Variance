@@ -10,25 +10,6 @@ function extractRows(payload) {
   return Array.isArray(data) ? data : [];
 }
 
-function redashHeaders(apiKey) {
-  return {
-    Accept: 'application/json',
-    Authorization: `Key ${apiKey}`,
-    'Content-Type': 'application/json'
-  };
-}
-
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function keySource() {
-  if (process.env.REDASH_DETAIL_USER_API_KEY) return 'REDASH_DETAIL_USER_API_KEY';
-  if (process.env.REDASH_API_KEY) return 'REDASH_API_KEY';
-  if (process.env.REDASH_DETAIL_API_KEY) return 'REDASH_DETAIL_API_KEY';
-  return 'none';
-}
-
 function redashHost(baseUrl) {
   try {
     return new URL(baseUrl).host;
@@ -37,94 +18,36 @@ function redashHost(baseUrl) {
   }
 }
 
-async function responsePreview(response, params = {}) {
-  const text = await response.text();
-  let preview = text.slice(0, 800);
-  Object.values(params).forEach(value => {
-    if (value) preview = preview.split(String(value)).join('[redacted]');
-  });
-  return preview;
+async function responsePreview(response) {
+  return (await response.text()).slice(0, 800);
 }
 
-async function runRedashQuery(queryId, params) {
+async function fetchCachedRows(queryId) {
   const baseUrl = String(process.env.REDASH_URL || '').replace(/\/$/, '');
-  const apiKey = process.env.REDASH_DETAIL_USER_API_KEY || process.env.REDASH_API_KEY || process.env.REDASH_DETAIL_API_KEY || '';
-  console.log('[attendance] Redash config', {
-    queryId: String(queryId),
-    redashHost: redashHost(baseUrl),
-    keySource: keySource(),
-    hasApiKey: Boolean(apiKey),
-    parameterNames: Object.keys(params || {}),
-    cohortIdLength: String(params?.cohort_id || '').length
-  });
+  const apiKey = process.env.REDASH_DETAIL_API_KEY || process.env.REDASH_DETAIL_USER_API_KEY || process.env.REDASH_API_KEY || '';
   if (!baseUrl || !apiKey || !queryId) throw new Error('Redash 환경변수가 설정되지 않았습니다.');
 
-  // 파라미터 쿼리는 latest results.json GET으로 조회할 수 없습니다.
-  // POST로 실행한 뒤 job을 확인하고 해당 query_result를 읽습니다.
-  const executeUrl = `${baseUrl}/api/queries/${encodeURIComponent(queryId)}/results`;
-  const executeResponse = await fetch(executeUrl, {
-    method: 'POST',
-    headers: redashHeaders(apiKey),
-    body: JSON.stringify({ max_age: 0, parameters: params })
+  const url = new URL(`${baseUrl}/api/queries/${encodeURIComponent(queryId)}/results.json`);
+  url.searchParams.set('api_key', apiKey);
+  console.log('[attendance] Redash cached result request', {
+    queryId: String(queryId),
+    redashHost: redashHost(baseUrl),
+    hasApiKey: Boolean(apiKey),
+    mode: 'cached-get'
   });
-  if (!executeResponse.ok) {
-    console.error('[attendance] Redash execute failed', {
-      status: executeResponse.status,
-      contentType: executeResponse.headers.get('content-type'),
-      body: await responsePreview(executeResponse, params)
+
+  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!response.ok) {
+    console.error('[attendance] Redash cached result failed', {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      body: await responsePreview(response)
     });
-    throw new Error(`Redash 파라미터 쿼리 실행 실패 (${executeResponse.status})`);
+    throw new Error(`Redash 저장 결과 조회 실패 (${response.status})`);
   }
 
-  const executePayload = await executeResponse.json();
-  const jobId = executePayload?.job?.id;
-  console.log('[attendance] Redash execute accepted', { hasJobId: Boolean(jobId) });
-  if (!jobId) throw new Error('Redash 쿼리 실행 작업 ID를 받지 못했습니다.');
-
-  let job;
-  for (let attempt = 0; attempt < 30; attempt++) {
-    await wait(500);
-    const jobResponse = await fetch(`${baseUrl}/api/jobs/${encodeURIComponent(jobId)}`, {
-      headers: redashHeaders(apiKey)
-    });
-    if (!jobResponse.ok) {
-      console.error('[attendance] Redash job status failed', {
-        status: jobResponse.status,
-        contentType: jobResponse.headers.get('content-type'),
-        body: await responsePreview(jobResponse)
-      });
-      throw new Error(`Redash 작업 상태 조회 실패 (${jobResponse.status})`);
-    }
-    job = (await jobResponse.json()).job;
-    if (job?.status === 3) break;
-    if ([4, 5].includes(job?.status)) {
-      console.error('[attendance] Redash job ended', { status: job?.status });
-      throw new Error('Redash 출결 쿼리 실행에 실패했습니다.');
-    }
-  }
-
-  console.log('[attendance] Redash job complete', {
-    status: job?.status,
-    hasQueryResultId: Boolean(job?.query_result_id)
-  });
-  if (job?.status !== 3 || !job?.query_result_id) {
-    throw new Error('Redash 출결 쿼리 응답 시간이 초과되었습니다.');
-  }
-
-  const resultResponse = await fetch(
-    `${baseUrl}/api/queries/${encodeURIComponent(queryId)}/results/${encodeURIComponent(job.query_result_id)}.json`,
-    { headers: redashHeaders(apiKey) }
-  );
-  if (!resultResponse.ok) {
-    console.error('[attendance] Redash result fetch failed', {
-      status: resultResponse.status,
-      contentType: resultResponse.headers.get('content-type'),
-      body: await responsePreview(resultResponse)
-    });
-    throw new Error(`Redash 결과 조회 실패 (${resultResponse.status})`);
-  }
-  const rows = extractRows(await resultResponse.json());
-  console.log('[attendance] Redash result received', { rowCount: rows.length });
+  const rows = extractRows(await response.json());
+  console.log('[attendance] Redash cached result received', { rowCount: rows.length });
   return rows;
 }
 
@@ -142,10 +65,26 @@ module.exports = async function handler(req, res) {
 
   try {
     const queryId = process.env.REDASH_DETAIL_QUERY_ID || '7983';
-    const rows = await runRedashQuery(queryId, { cohort_id: cohortId });
+    const allRows = await fetchCachedRows(queryId);
+    const cohortKey = allRows.find(row => Object.prototype.hasOwnProperty.call(row, 'cohort_id'))
+      ? 'cohort_id'
+      : allRows.find(row => Object.prototype.hasOwnProperty.call(row, 'cohortid'))
+        ? 'cohortid'
+        : null;
+
+    if (!cohortKey) {
+      throw new Error('7983 결과에 cohort_id 컬럼이 없습니다. 전체 조회 쿼리에 cohort_id를 포함해 주세요.');
+    }
+
+    const rows = allRows.filter(row => String(row[cohortKey] || '').trim() === cohortId);
+    console.log('[attendance] Cohort filter complete', {
+      cohortIdLength: cohortId.length,
+      sourceRowCount: allRows.length,
+      matchedRowCount: rows.length
+    });
     res.status(200).json({ rows });
   } catch (error) {
     console.error('attendance api error', error);
-    res.status(502).json({ error: '출결 데이터를 불러오지 못했습니다.' });
+    res.status(502).json({ error: error.message || '출결 데이터를 불러오지 못했습니다.' });
   }
 };

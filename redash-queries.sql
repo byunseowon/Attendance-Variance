@@ -13,8 +13,9 @@ WHERE __hevo__marked_deleted = false
 ORDER BY courseid, cohortnum DESC;
 
 
--- Query 2: 선택한 기수의 수강생·출결 상세
--- Redash 파라미터: cohort_id
+-- Query 2: 전체 기수 수강생·출결 상세
+-- Redash Refresh Schedule로 캐시 결과를 주기적으로 갱신합니다.
+-- cohort_id는 결과 컬럼으로 반환하고, Vercel API에서 선택 기수만 필터링합니다.
 WITH latest_attendance AS (
   SELECT
     a.*,
@@ -69,7 +70,6 @@ JOIN latest_attendance a
  AND a.row_num = 1
 WHERE t.__hevo__marked_deleted = false
   AND c.__hevo__marked_deleted = false
-  AND c._id = '{{ cohort_id }}'
   AND t.status IN ('수강중', '수료', '중도하차')
 ORDER BY
   CASE

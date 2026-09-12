@@ -181,7 +181,9 @@ HRD-Net에서 내보낸 출석부 파일(`.xlsx` 또는 `.xls`)을 업로드합�
    - `REDASH_CATALOG_QUERY_ID`: `7982`
    - `REDASH_CATALOG_API_KEY`: 7982 쿼리의 Query API Key
    - `REDASH_DETAIL_QUERY_ID`: `7983`
-   - `REDASH_DETAIL_API_KEY`: 7983 쿼리의 Query API Key
-4. Vercel에 재배포하면 화면에서 트랙 목록을 자동으로 불러옵니다.
+   - `REDASH_DETAIL_API_KEY`: 7983 캐시 결과 조회용 Query API Key
+4. 7983 쿼리는 전체 기수 데이터를 조회하고 `cohort_id`를 결과 컬럼으로 포함해야 합니다.
+5. 7983의 Refresh Schedule을 매일 00:30으로 설정합니다.
+6. Vercel에 재배포하면 선택한 기수의 행만 서버에서 필터링해 표시합니다.
 
 사용자는 화면에서 트랙과 기수만 선택하며, API 키와 쿼리 ID는 노출되지 않습니다.
