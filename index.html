@@ -209,6 +209,8 @@ textarea::placeholder { color: #c8c4d0; }
   padding: 12px 14px; font-size: 0.75rem; color: #7a6a3a; line-height: 1.7;
 }
 .threshold-hint strong { color: #c08000; }
+.precision-note { color: #8b7d72; font-size: 0.7rem; line-height: 1.55; padding: 10px 12px; border-radius: 10px; background: rgba(196,181,244,0.1); }
+.result-precision-note { margin-bottom: 16px; }
 
 /* 실행 버튼 */
 .btn-run {
@@ -583,6 +585,7 @@ tr.row-early:hover { background: rgba(196,181,244,0.18); }
   </div>
 
   <div class="card result-section" id="resultSection">
+    <div class="precision-note result-precision-note">백오피스는 출석률을 정수로, HRD는 소수점 첫째 자리까지 표시합니다.<br>본 서비스는 정밀한 비교를 위해 소수점 첫째 자리까지 표시하므로 백오피스 화면과 미세한 차이가 발생할 수 있습니다.</div>
     <div class="loading-panel" id="resultLoading" hidden>
       <span class="loading-spinner"></span>
       <span id="resultLoadingText">출결 데이터를 불러오는 중입니다.</span>
